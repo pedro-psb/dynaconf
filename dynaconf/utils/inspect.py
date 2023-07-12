@@ -53,7 +53,7 @@ class OutputFormatError(Exception):
 
 def inspect_settings(
     settings: Settings | LazySettings,
-    key_dotted_path: str = "",
+    key: str = "",
     env: str = "",
     ascending_order: bool = True,
     to_file: str = "",
@@ -64,13 +64,12 @@ def inspect_settings(
     Prints loading history about a specific key (as dotted path string)
     Optionally, writes data to file in desired format instead.
 
-    Args:
-        settings: a Dynaconf instance
-        key_dotted_path: string dotted path. E.g "path.to.key"
-        ascending_order: if True, newest to oldest loading order
-        fo_file: if specified, write to this filename
-        output_format: available output format options
-        custom_dumper: if provided, it is used instead of builtins
+    :param settings: the Dynaconf instance to inspect
+    :param key: dotted-path to key. E.g "path.to.key" (if omitted, inspect all)
+    :param ascending_order: if True, sort history from newest to oldest
+    :param fo_file: if specified, write to this filename
+    :param output_format: available output format options
+    :param custom_dumper: if provided, uses this instead of builtins
     """
     # get filtered history
     original_settings = settings
@@ -85,12 +84,12 @@ def inspect_settings(
 
     history = get_history(
         original_settings,
-        key_dotted_path=key_dotted_path,
+        key=key,
         filter_src_metadata=env_filter,
     )
-    if key_dotted_path and not history:
+    if key and not history:
         raise KeyNotFoundError(
-            f"The requested key was not found: {key_dotted_path!r}"
+            f"The requested key was not found: {key!r}"
         )
 
     # setup output format
@@ -99,10 +98,10 @@ def inspect_settings(
     history_order = "ascending" if ascending_order else "descending"
 
     header_env = env or "None"
-    header_key = key_dotted_path or "None"
+    header_key = key or "None"
     header_value = (
-        settings.get(key_dotted_path)
-        if key_dotted_path
+        settings.get(key)
+        if key
         else settings.as_dict()
     )
 
@@ -144,8 +143,8 @@ def inspect_settings(
 
 def get_history(
     obj: Settings | LazySettings,
-    key_dotted_path: str = "",
-    filter_src_metadata: Callable[[SourceMetadata], bool] = lambda x: True,
+    key: str = "",
+    filter_src_metadata: Callable[[SourceMetadata], bool] = lambda src: True,
 ) -> list[dict]:
     """
     Gets data from `settings.loaded_by_loaders` in order of loading with
@@ -154,10 +153,9 @@ def get_history(
     Returns a list of dict in ascending order, where the
     dict contains the data and it's source metadata.
 
-    Args:
-        obj: Setting object which contain the data
-        key_dotted_path: dot-path to desired key. Use all if not provided
-        filter_src_metadata: takes SourceMetadata and returns a boolean
+    :param obj: Setting object which contain the data
+    :param key: dotted-path to key. E.g "path.to.key" (if omitted, gets all)
+    :param filter_src_metadata: takes SourceMetadata and returns a boolean
 
     Example:
         >>> settings = Dynaconf(...)
@@ -168,12 +166,14 @@ def get_history(
                 "identifier": "path/to/file.yml"
                 "env": "default"
                 "data": {"foo": 123, "spam": "eggs"
+                "merged": False
             },
             {
                 "loader": "yaml"
                 "identifier": "path/to/file.yml"
                 "env": "default"
                 "data": {"foo": 123, "spam": "eggs"
+                "merged": False
             }
         ]
     """
@@ -186,8 +186,8 @@ def get_history(
         # filter by key path
         try:
             data = (
-                _get_data_by_key(data, key_dotted_path)
-                if key_dotted_path
+                _get_data_by_key(data, key)
+                if key
                 else data
             )
         except KeyError:

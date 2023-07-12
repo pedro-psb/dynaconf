@@ -425,7 +425,7 @@ def test_get_history_key_filter(tmp_path):
     create_file(file_c, "a='cA'\nb='cB'\nc='cC'")
 
     settings = Dynaconf(settings_file=[file_a, file_b, file_c])
-    history = get_history(settings, key_dotted_path="a")
+    history = get_history(settings, key="a")
     assert history[0]["value"] == "aA"
     assert history[1]["value"] == "bA"
     assert history[2]["value"] == "cA"
@@ -441,7 +441,7 @@ def test_get_history_key_filter_nested(tmp_path):
     create_file(file_c, "a.b='cB'\na.c='cC'")
 
     settings = Dynaconf(settings_file=[file_a, file_b, file_c])
-    history = get_history(settings, key_dotted_path="a.c")
+    history = get_history(settings, key="a.c")
     assert len(history) == 3
     assert history[0]["value"] == "aC"
     assert history[1]["value"] == "bC"
@@ -523,7 +523,7 @@ def test_get_history_env_and_key_filter(tmp_path):
     settings.from_env("prod")  # CAVEAT: activate loading of prod
     history = get_history(
         settings,
-        key_dotted_path="bar",
+        key="bar",
         filter_src_metadata=lambda x: x.env.lower() == "prod",
     )
     assert len(history) == 2
@@ -762,7 +762,7 @@ def test_caveat__get_history_env_true_workaround(tmp_path):
 def test_inspect_exception_key_not_found():
     settings = Dynaconf()
     with pytest.raises(KeyNotFoundError):
-        inspect_settings(settings, key_dotted_path="non_existant")
+        inspect_settings(settings, key="non_existant")
 
 
 def test_inspect_empty_settings(capsys):

@@ -839,7 +839,7 @@ def inspect(key, env, format, descending):  # pragma: no cover
     try:
         inspect_settings(
             settings,
-            key_dotted_path=key,
+            key=key,
             env=env,
             output_format=format,
             ascending_order=(not descending),
