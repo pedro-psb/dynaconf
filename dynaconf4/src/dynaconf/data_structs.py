@@ -1,12 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import NamedTuple
 
 import rich
-
-if TYPE_CHECKING:
-    from .dynaconf_options import SharedOptions
 
 
 class BaseOptions:
@@ -59,7 +56,33 @@ class LazyTree:
 class SchemaTree: ...
 
 
-@dataclass
-class LoaderSpec:
+class LoaderSpec(NamedTuple):
     loader_id: str
     uri: str
+    order: int
+
+
+class LoadedDataStack:
+    def __init__(self):
+        self.stack = []
+        self.index = 0
+
+    def add(self, loaded_data: LoadedData):
+        """Add item to stack."""
+        self.stack.append(loaded_data)
+        self.index += 1
+
+    def pop(self) -> DataDict:
+        """Virtually pops from the top of the stack.
+
+        The loaded data is not removed from storate.
+        """
+        if not self.stack:
+            raise ValueError("The stack is empty.")
+
+        if self.index == 0:
+            raise ValueError("All stack items were consumed.")
+        return self.stack.pop()
+
+    def reset_index(self):
+        self.index = len(self.stack) - 1

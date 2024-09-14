@@ -2,11 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from .data_structs import DataDict
+from .data_structs import DataDict, LoadRequest
 from .typing import Optional, SharedOptions
-
-DataByEnv = dict[str, DataDict]
-LoaderSpec = tuple[str, str]  # (loader_id, uri)
 
 
 @dataclass
@@ -27,23 +24,74 @@ class LoadingManager:
         self.shared_options = shared_options
         self.options = options or LoadingOptions()
         self.loader_registry: dict[str, ResourceLoader] = {}
-        self.loaded_data: dict[str, list[LoadedData]] = {}
-        """Some description"""
 
-    def load_resource(self, loader_id: str, uri: str) -> dict:
+        self.data_chain_by_env: dict[str, LoadedDataChain] = {}
+        """Mapping of env to LoadedDataChain."""
+
+    def load_resource(self, load_request: LoadRequest) -> dict:
         """Load data from sources using registered loaders.
 
-        Store and return a env-data map in the format: {env_name<str>: data<DataDict>}
+        The loaded data is split into environemtns added to the env_data_map,
+        which contains the stack of loaded data for each env.
+
+        Returns:
+            An env-data map in the format: {env_name<str>: data<DataDict>}
         """
-        return {}
+        loader_id, uri, order = load_request
+
+        # loading pipeline
+        loader = self.loader_registry[loader_id]
+        raw_bytes = loader.read(uri)
+        parsed_data = loader.parse(raw_bytes)
+        env_data_map = loader.split_envs(parsed_data)
+
+        # add data to each env's LoadedDataChain
+        for env, data in env_data_map.items():
+            data_dict = DataDict(data)
+            loaded_data = LoadedData(load_request, data_dict)
+            self.data_chain_by_env[env].add(loaded_data)
+        return env_data_map
+
+    def pop_from_env(self, env: str) -> DataDict:
+        return self.data_chain_by_env[env].pop()
 
 
 @dataclass
 class LoadedData:
-    loader_id: str
-    uri: str
-    parsed_data: dict
-    order: int
+    loader_spec: LoadRequest
+    parsed_data: DataDict
+
+
+class LoadedDataChain:
+    def __init__(self):
+        self.stack = []
+        self.index = 0
+
+    def add(self, loaded_data: LoadedData):
+        """Add item to stack.
+
+        TODO: handle sorting when loaders are run concurrently.
+        """
+        self.stack.append(loaded_data)
+        self.index += 1
+
+    def top(self) -> DataDict:
+        return self.stack[self.index].parsed_data
+
+    def pop(self) -> DataDict:
+        """Virtually pops from the top of the stack.
+
+        The loaded data is not removed from storate.
+        """
+        if not self.stack:
+            raise ValueError("The stack is empty.")
+
+        if self.index == 0:
+            raise ValueError("All stack items were consumed.")
+        return self.stack.pop().parsed_data
+
+    def reset_index(self):
+        self.index = len(self.stack) - 1
 
 
 class ResourceLoader:
