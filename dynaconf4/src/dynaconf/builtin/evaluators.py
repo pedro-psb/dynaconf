@@ -1,7 +1,7 @@
-from ..data_structs import DataDict, DynaconfToken, SchemaTree, DynaconfTree
+from ..data_structs import DynaconfToken, SchemaTree, DynaconfTree
 
 
-class DefaultDynaconfParser:
+class DefaultEvaluator:
     PARSER_ID = "default"
 
     def parse_tree(self, data: dict, schema_tree: SchemaTree) -> DynaconfTree:
@@ -17,9 +17,22 @@ class DefaultDynaconfParser:
         Some converters that requires lazy evaluation are:
         * Values that depends on other values (variable interpolation).
         * Transformation function that needs to be triggered some time after loading, for example,
-          on the key access.
+          on key access.
+
+        Params:
+            data: The python dict/list tree with potential to be parsed.
+            schema_tree: The user-defined schema-tree providing context on some parsing decisions.
         """
         raise NotImplementedError()  # TODO: implement
 
-    def _handle_dynaconf_string(self, dynaconf_string: str) -> DynaconfToken:
+    def _tokenize_dynaconf_string(self, dynaconf_string: str) -> DynaconfToken:
+        raise NotImplementedError()  # TODO: implement
+
+    def evaluate_lazy_settigns(self, dynaconf_tree: DynaconfTree, context: dict):
+        """Evaluate lazy values in a DynaconfTree structure.
+
+        Params:
+            dynaconf_tree: The tree which should have it's lazy values evaluated. The final values ARE NOT special objects.
+            context: The context used for variable interpolation lookup.
+        """
         raise NotImplementedError()  # TODO: implement

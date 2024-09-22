@@ -32,13 +32,6 @@ class MergeOperation:
         """
 
 
-class LazyValue:
-    def __init__(self, key: str):
-        self.key = key
-
-    def evaluate(self): ...
-
-
 @dataclass
 class SchemaTree: ...
 
@@ -80,6 +73,8 @@ class DynaconfToken:
     Params:
         token_id:
             The token name identifier. Used to relate to a specific token hanlder function.
+        is_lazy:
+            Whether this is a lazy token or not.
         arg_list:
             List of arguments (possibly empty) of the dynaconf string. E.g:
             In "@insert 1 foo", arg_list=[1].
@@ -89,6 +84,7 @@ class DynaconfToken:
     """
 
     token_id: str
+    is_lazy: bool
     arg_list: list
     next_token: DynaconfToken
 
@@ -102,7 +98,8 @@ class DynaconfTree:
             A DataDict instance. Its subtrees are composed of DataDict or DataList and they should contain
             node-level metadata about merging, lazy-eval and validation.
         lazy_cache_map:
-            Maps key names which contains lazy values with it's container object.
+            Maps key names which contains lazy values with it's container object. Auxiliary structure to
+            make it more efficient to evaluate lazy values without requiring a full traversal.
     """
 
     root: DataDict

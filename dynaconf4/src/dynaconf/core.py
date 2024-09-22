@@ -30,8 +30,8 @@ class DynaconfCore:
         self.plugin_manager = pluggy.PluginManager("dynaconf4")
 
         # state
-        self.load_request_stack: Stack[LoadRequest] = Stack[LoadRequest]()
-        self.loaded_data_stack: dict[str, Stack[DynaconfTree]] = defaultdict(
+        self._load_request_stack: Stack[LoadRequest] = Stack[LoadRequest]()
+        self._loaded_data_stack: dict[str, Stack[DynaconfTree]] = defaultdict(
             default_factory=Stack[DynaconfTree]  # type: ignore
         )
 
@@ -40,18 +40,18 @@ class DynaconfCore:
         raise NotImplementedError()
 
     def add_loader_request(self, loader_request: LoadRequest):
-        self.load_request_stack.push(loader_request)
+        self._load_request_stack.push(loader_request)
 
     def run_loaders(self):
         """Load data from load_request_stack, parse to DynaconfTree and push do loaded_data_stack."""
-        while not self.load_request_stack.is_empty():
-            load_request = self.load_request_stack.pop()
+        while not self._load_request_stack.is_empty():
+            load_request = self._load_request_stack.pop()
             env_data_map = self.loading_manager.load_resource(load_request)
             for env, data in env_data_map.items():
                 dynaconf_tree = self.evaluation_manager.parse_tree(
                     data, self.schema_tree
                 )
-                self.loaded_data_stack[env].push(dynaconf_tree)
+                self._loaded_data_stack[env].push(dynaconf_tree)
 
     def merge_loaded_data(self, env: Optional[str] = None):
         """Merge data from the loaded_data_stack for all or selected envs.
@@ -61,7 +61,7 @@ class DynaconfCore:
         env_names_list = [env] if env else self.env_manager.env_names
         for env_name in env_names_list:
             base_data = self.env_manager.get(env_name)
-            income_data_stack = self.loaded_data_stack[env_name]
+            income_data_stack = self._loaded_data_stack[env_name]
             while not income_data_stack.is_empty():
                 income_data = income_data_stack.pop()
                 self.merging_manager.merge_data(base_data, income_data)
