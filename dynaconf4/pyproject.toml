@@ -21,7 +21,8 @@ license = {file = "LICENSE.txt"}
 # For an analysis of this field vs pip's requirements files see:
 # https://packaging.python.org/discussions/install-requires-vs-requirements/
 dependencies = [
-  "rich"
+  "rich",
+  "pluggy"
 ]
 
 # Optional dependencies the project provides. These are commonly 

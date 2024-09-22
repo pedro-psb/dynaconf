@@ -22,6 +22,7 @@ class SharedOptions(BaseOptions):
     """Settings that should be available in every module scope."""
 
     instance_name: str = "dynaconf"
+    default_env_name: str = "default"
 
 
 @dataclass

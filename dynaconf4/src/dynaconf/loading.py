@@ -1,9 +1,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Optional
 
-from .data_structs import DataDict, LoadRequest
-from .typing import Optional, SharedOptions
+from .builtin.loaders import DirectLoader, EnvironLoader, SqliteLoader, TomlLoader
+from .data_structs import LoadRequest, EnvName
+
+from .hookspec import ResourceLoader
+
+if TYPE_CHECKING:
+    from .dynaconf_options import SharedOptions
 
 
 @dataclass
@@ -15,101 +21,84 @@ class SimpleLoad:
 @dataclass
 class LoadingOptions:
     simple_startup: SimpleLoad = field(default_factory=SimpleLoad)
+    cache_loaded_data: bool = False
 
 
 class LoadingManager:
     def __init__(
-        self, shared_options: SharedOptions, options: Optional[LoadingOptions] = None
+        self,
+        shared_options: SharedOptions,
+        options: Optional[LoadingOptions] = None,
     ):
+        # config
         self.shared_options = shared_options
         self.options = options or LoadingOptions()
-        self.loader_registry: dict[str, ResourceLoader] = {}
 
-        self.data_chain_by_env: dict[str, LoadedDataChain] = {}
-        """Mapping of env to LoadedDataChain."""
+        # plugins
+        self.loader_registry: dict[str, ResourceLoader] = {
+            "builtin.loaders.direct": DirectLoader(),
+            "builtin.loaders.toml": TomlLoader(),
+            "builtin.loaders.environ": EnvironLoader(),
+            "builtin.loaders.sqlite": SqliteLoader(),
+        }
 
-    def load_resource(self, load_request: LoadRequest) -> dict:
+        # state
+        self.loaded_data_cache: dict[LoadRequest, dict[EnvName, dict]]
+        """The cache of raw data that was effectively loaded for each env."""
+
+        self.env_names: set[str] = set()
+        """The list of name that were effectively loaded."""
+
+    def add_loader(self, loader_id: str, loader_instance: ResourceLoader):
+        if loader_id in self.loader_registry:
+            raise ValueError(
+                "Unique constrain error: The loader with id='{}' already exists."
+            )
+
+        self.loader_registry[loader_id] = loader_instance
+
+    def load_resource(self, load_request: LoadRequest) -> dict[EnvName, dict]:
         """Load data from sources using registered loaders.
 
-        The loaded data is split into environemtns added to the env_data_map,
-        which contains the stack of loaded data for each env.
+        The loaded data is split into environemnts, optionally saved to loaded cache
+        and IS NOT processed.
 
         Returns:
-            An env-data map in the format: {env_name<str>: data<DataDict>}
+            An env-data map in the format: {env_name<str>: data<dict>}
         """
-        loader_id, uri, order = load_request
+        loader = self.loader_registry[load_request.loader_id]
+        has_explicit_envs = load_request.has_explicit_envs or loader.has_explicit_envs
 
         # loading pipeline
-        loader = self.loader_registry[loader_id]
-        raw_bytes = loader.read(uri)
-        parsed_data = loader.parse(raw_bytes)
-        env_data_map = loader.split_envs(parsed_data)
+        raw_bytes = loader.read(load_request.uri)
+        parsed_data = loader.parse(raw_bytes, data=load_request.data)
+        env_data_map = loader.split_envs(
+            parsed_data,
+            has_explicit_envs=has_explicit_envs,
+            default_env=self.shared_options.default_env_name,
+        )
 
-        # add data to each env's LoadedDataChain
-        for env, data in env_data_map.items():
-            data_dict = DataDict(data)
-            loaded_data = LoadedData(load_request, data_dict)
-            self.data_chain_by_env[env].add(loaded_data)
+        # state update
+        for env in env_data_map.keys():
+            self.env_names.add(env.lower())
+
+        if self.options.cache_loaded_data:
+            self.loaded_data_cache[load_request] = env_data_map
+
         return env_data_map
 
-    def pop_from_env(self, env: str) -> DataDict:
-        return self.data_chain_by_env[env].pop()
+    def debug(self):
+        """Print useful debuggin info.
 
-
-@dataclass
-class LoadedData:
-    loader_spec: LoadRequest
-    parsed_data: DataDict
-
-
-class LoadedDataChain:
-    def __init__(self):
-        self.stack = []
-        self.index = 0
-
-    def add(self, loaded_data: LoadedData):
-        """Add item to stack.
-
-        TODO: handle sorting when loaders are run concurrently.
+        TODO make the data JSON serializable to use json.dumps(o, indent=4).
+        The readability is so much better.
         """
-        self.stack.append(loaded_data)
-        self.index += 1
+        import rich
 
-    def top(self) -> DataDict:
-        return self.stack[self.index].parsed_data
-
-    def pop(self) -> DataDict:
-        """Virtually pops from the top of the stack.
-
-        The loaded data is not removed from storate.
-        """
-        if not self.stack:
-            raise ValueError("The stack is empty.")
-
-        if self.index == 0:
-            raise ValueError("All stack items were consumed.")
-        return self.stack.pop().parsed_data
-
-    def reset_index(self):
-        self.index = len(self.stack) - 1
-
-
-class ResourceLoader:
-    """Core API for loading a resource."""
-
-    LOADER_ID = "builtin.base"
-
-    def read(self, uri: str) -> bytes:
-        """Open/read the resource and return it's raw (bytes) data."""
-        return b""
-
-    def parse(self, raw_bytes: bytes) -> dict:
-        """Parse a raw (bytes) data and return its parsed data (dict, list and native types)."""
-        return {}
-
-    def split_envs(self, parsed_data: dict) -> dict[str, dict]:
-        """Split the parsed data into environments {env: data}."""
-        return {"production": {"key": "value"}}
+        rich.print("\nloader_registry:")
+        rich.print(self.loader_registry)
+        rich.print("\loaded_data_cache:")
+        rich.print(self.loaded_data_cache)
 
 
 def BatchLoader(*args, **kwargs) -> list[ResourceLoader]:
@@ -124,4 +113,4 @@ def BatchLoader(*args, **kwargs) -> list[ResourceLoader]:
                    YmlLoader("my/config_dir/file-2.yml"), ...]
         ```
     """
-    return
+    raise NotImplementedError()
