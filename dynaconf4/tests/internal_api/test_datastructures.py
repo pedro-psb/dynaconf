@@ -1,4 +1,4 @@
-from dynaconf_builtin.registry import Add
+from internal_api.registry import Add
 
 
 def test_equallity():

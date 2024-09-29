@@ -1,10 +1,10 @@
 from __future__ import annotations
 from typing import NamedTuple, Sequence, Optional, Callable, TypeVar, Generic
-from dynaconf_builtin.abstract import BaseOperation, BaseMergeTree
+from internal_api.abstract import BaseOperation, BaseMergeTree
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from dynaconf_builtin.registry import Merge
+    from internal_api.registry import Merge
 
 
 def is_token(value: str) -> bool:

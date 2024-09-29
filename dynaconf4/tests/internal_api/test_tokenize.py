@@ -1,5 +1,5 @@
-from dynaconf_builtin.create_mtree import tokenize, TokenRegistry, create_token
-from dynaconf_builtin.datastructures import DynaconfToken
+from internal_api.create_mtree import tokenize, TokenRegistry, create_token
+from internal_api.datastructures import DynaconfToken
 from dataclasses import dataclass
 import functools
 import pytest

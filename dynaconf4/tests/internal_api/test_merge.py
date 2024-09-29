@@ -2,9 +2,9 @@ from dataclasses import dataclass
 
 import pytest
 
-from dynaconf_builtin.apply_mtree import apply_merge_tree
-from dynaconf_builtin.create_mtree import create_merge_tree
-from dynaconf_builtin.registry import (
+from internal_api.apply_mtree import apply_merge_tree
+from internal_api.create_mtree import create_merge_tree
+from internal_api.registry import (
     Add,
     Append,
     AppendUnique,
@@ -12,7 +12,7 @@ from dynaconf_builtin.registry import (
     Merge,
     Replace,
 )
-from dynaconf_builtin.datastructures import MergeTree
+from internal_api.datastructures import MergeTree
 
 
 @dataclass
@@ -226,7 +226,7 @@ scenario_set = [
 
 
 def debug_diff(result, expected, raw):
-    from dynaconf_builtin.utils import section_print
+    from internal_api.utils import section_print
     section_print("raw", raw)
     section_print("result", result)
     section_print("expected", expected)

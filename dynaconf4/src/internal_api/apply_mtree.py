@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from copy import deepcopy
 
-from dynaconf_builtin.datastructures import BaseMergeTree, TreePath, ensure_path, ensure_rooted
-from dynaconf_builtin.registry import Merge, JumpMerge
+from internal_api.datastructures import BaseMergeTree, TreePath, ensure_path, ensure_rooted
+from internal_api.registry import Merge, JumpMerge
 
 
 def apply_merge_tree(
