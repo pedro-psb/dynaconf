@@ -68,18 +68,25 @@ class LoadingManager:
         """
         loader = self.loader_registry[load_request.loader_id]
         has_explicit_envs = load_request.has_explicit_envs or loader.has_explicit_envs
+        allowed_envs = load_request.allowed_env_list
+        used_envs = []
 
         # loading pipeline
         raw_bytes = loader.read(load_request.uri)
-        parsed_data = loader.parse(raw_bytes, data=load_request.data)
+        parsed_data = loader.parse(raw_bytes, data=load_request.direct_data)
         env_data_map = loader.split_envs(
             parsed_data,
             has_explicit_envs=has_explicit_envs,
             default_env=self.shared_options.default_env_name,
         )
 
+        # optional env filtering
+        used_envs = allowed_envs or list(env_data_map.keys())
+        if allowed_envs:
+            env_data_map = {env:data for env,data in env_data_map.items() if env in allowed_envs}
+
         # state update
-        for env in env_data_map.keys():
+        for env in used_envs:
             self.env_names.add(env.lower())
 
         if self.options.cache_loaded_data:

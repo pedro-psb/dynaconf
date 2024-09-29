@@ -6,6 +6,7 @@ from .core import DynaconfCore
 from .data_structs import SchemaTree
 from .dynaconf_options import Options
 from .typed.type_definitions import DataDict
+from .data_structs import DataDict as NewDataDict
 
 SchemaType = type[DataDict]  # actually a subclass of that
 
@@ -45,17 +46,6 @@ class DynaconfApi:
     ): ...
 
 
-class DynaconfLegacyApi:
-    def __init__(self, dynaconf_core: DynaconfCore):
-        self.__dynaconf_core__ = dynaconf_core
-
-    def get_fresh(self, key, fresh=False): ...
-
-    def exists(self, key, fresh=False): ...
-
-    def as_dict(self): ...
-
-
 class LoadApi:
     def add(self): ...
 
@@ -80,3 +70,27 @@ class EnvApi:
     def get(self): ...
 
     def list(self): ...
+
+
+def CompatDynaconf(*args, **kwargs):
+    class Settings(NewDataDict):
+        pass
+    schema = parse_schema(Settings)
+    options = Options()
+    dynaconf_core = DynaconfCore(schema, options)
+    dynaconf_api = CompatDynaconfApi(dynaconf_core)
+    settings = Settings()
+    settings.__init_dynaconf__(dynaconf_api)
+    return settings
+
+class CompatDynaconfApi:
+    def __init__(self, dynaconf_core: DynaconfCore):
+        self.__dynaconf_core__ = dynaconf_core
+
+    def get_fresh(self, key, fresh=False): ...
+
+    def exists(self, key, fresh=False): ...
+
+    def as_dict(self): ...
+
+

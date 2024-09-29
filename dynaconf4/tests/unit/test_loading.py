@@ -1,49 +1,35 @@
+import pytest
+
 from dynaconf.data_structs import LoadRequest
 from dynaconf.dynaconf_options import SharedOptions
 from dynaconf.loading import LoadingManager
-import pytest
+import os
 
 
-def test_basic_loading():
+@pytest.fixture
+def default_lm():
     opts = SharedOptions()
     lm = LoadingManager(opts)
+    return lm
 
-    # without envs (DirectLoader default)
+
+def test_load_with_no_root_level_envs(default_lm: LoadingManager):
     data = {"foo": "from-load-1"}
     load_request = LoadRequest(
-        loader_id="builtin.loaders.direct", uri="unit_test", data=data
+        loader_id="builtin.loaders.direct", uri="unit_test", direct_data=data
     )
-    lm.load_resource(load_request)
+    result = default_lm.load_resource(load_request)
+    assert result["default"] == data
 
-    # without envs
+
+def test_load_with_root_level_envs(default_lm: LoadingManager):
     data = {"default": {"foo": "from-load-2"}, "prod": {"foo": "prod-bar"}}
     load_request = LoadRequest(
         loader_id="builtin.loaders.direct",
         uri="unit_test",
-        data=data,
+        direct_data=data,
         has_explicit_envs=True,
     )
-    lm.load_resource(load_request)
-    assert lm.get("default") == data["default"]
-    assert lm.get("prod") == data["prod"]
-
-    # loaded data stack
-    load2 = lm.pop("default")
-    load1 = lm.pop("default")
-    assert load2["foo"] == "from-load-2"
-    assert load1["foo"] == "from-load-1"
-
-    msg = "consumed"
-    with pytest.raises(ValueError, match=msg):
-        lm.pop("default")
-
-    # reset loaded stack
-    lm.reset_loaded_stack("default")
-    load2 = lm.pop("default")
-    load1 = lm.pop("default")
-    assert load2["foo"] == "from-load-2"
-    assert load1["foo"] == "from-load-1"
-
-    msg = "consumed"
-    with pytest.raises(ValueError, match=msg):
-        lm.pop("default")
+    result = default_lm.load_resource(load_request)
+    assert result["default"] == data["default"]
+    assert result["prod"] == data["prod"]

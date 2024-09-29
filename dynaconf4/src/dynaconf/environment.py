@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 
 @dataclass
 class EnvOptions(BaseOptions):
-    env_names: list[str] = ["default", "dev", "prod"]
+    env_names: list[str] = ("default", "dev", "prod")
     strict_env_names: bool = True
 
 

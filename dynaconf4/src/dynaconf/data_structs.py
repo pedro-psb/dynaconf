@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import NamedTuple, Optional
-from typing import TypeVar, Generic
+from typing import Generic, NamedTuple, Optional, TypeVar
 
 import rich
 
@@ -12,10 +11,23 @@ class BaseOptions:
         rich.print(self)
 
 
-class DataDict(dict): ...
+class DataDict(dict):
+    def __init__(self, *args, **kwargs):
+        self.__dynaconf_data__ = {}
+        super().__init__(*args, **kwargs)
+
+    def __init_dynaconf__(self, dynaconf_api):
+        self.__dynaconf_data__["dynaconf_api"] = dynaconf_api
+
+    def get_dynaconf(self):
+        dynaconf_api = self.__dynaconf_data__.get("dynaconf_api", None)
+        if not dynaconf_api:
+            raise RuntimeError("Dynaconf not initialized.")
+        return dynaconf_api
 
 
-class DataList(list): ...
+class DataList(list):
+    ...
 
 
 EnvName = str  # alias for better semantics
@@ -33,7 +45,8 @@ class MergeOperation:
 
 
 @dataclass
-class SchemaTree: ...
+class SchemaTree:
+    ...
 
 
 T = TypeVar("T")
@@ -60,10 +73,12 @@ class LoadRequest(NamedTuple):
     uri: str
     order: int = 0
     has_explicit_envs: Optional[bool] = None
-    data: Optional[dict] = None
+    allowed_env_list: Optional[list] = None
+    direct_data: Optional[dict] = None
 
 
-class LoadResponse(NamedTuple): ...
+class LoadResponse(NamedTuple):
+    ...
 
 
 @dataclass

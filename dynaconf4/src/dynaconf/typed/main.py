@@ -7,8 +7,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 
-from dynaconf.base import LazySettings
-from dynaconf.base import Settings as BaseDynaconfSettings
 from dynaconf.typed import guards as gu
 from dynaconf.typed import utils as ut
 from dynaconf.utils.functional import Empty
@@ -48,7 +46,7 @@ class Options:
         }
 
 
-class Dynaconf(BaseDynaconfSettings):
+class Dynaconf:
     """Interface to create an instance of Dynaconf based on typing.
 
     This class is a builder for a new instance of Dynaconf with validators
