@@ -227,6 +227,7 @@ scenario_set = [
 
 def debug_diff(result, expected, raw):
     from _dynaconf.utils import section_print
+
     section_print("raw", raw)
     section_print("result", result)
     section_print("expected", expected)

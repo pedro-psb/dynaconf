@@ -12,6 +12,8 @@ T = TypeVar("T")
 
 
 def is_token(value: str) -> bool:
+    if not isinstance(value, str):
+        return False
     return isinstance(value, str) and value.startswith("@")
 
 
@@ -26,12 +28,15 @@ def ensure_path(path: TreePath | str) -> TreePath:
         return TreePath([cast_int(val) for val in path.split(".")])
     return path
 
+
 def ensure_rooted(_data: dict):
     if "root" not in _data.keys():
         return {"root": _data}
     return _data
-        
+
+
 # loader related
+
 
 class Loader:
     read: Callable
@@ -48,8 +53,8 @@ class LoadRequest(NamedTuple):
     direct_data: Optional[dict] = None
 
 
-
 # linear data structures
+
 
 class LinearDataStructure(Generic[T]):
     def __init__(self):
@@ -80,7 +85,9 @@ class Queue(LinearDataStructure):
     def enqueue(self, item):
         self._data.insert(0, item)
 
+
 # trees related
+
 
 class TreePath(tuple):
     def as_str(self):

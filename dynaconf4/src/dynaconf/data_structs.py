@@ -26,8 +26,7 @@ class DataDict(dict):
         return dynaconf_api
 
 
-class DataList(list):
-    ...
+class DataList(list): ...
 
 
 EnvName = str  # alias for better semantics
@@ -45,8 +44,7 @@ class MergeOperation:
 
 
 @dataclass
-class SchemaTree:
-    ...
+class SchemaTree: ...
 
 
 T = TypeVar("T")
@@ -66,4 +64,3 @@ class Stack(Generic[T]):
 
     def is_empty(self) -> bool:
         return not self.items
-

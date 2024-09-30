@@ -2,6 +2,7 @@ from ..data_structs import SchemaTree
 from _dynaconf.datastructures import DynaconfToken
 from _dynaconf.abstract import BaseMergeTree
 
+
 class DefaultEvaluator:
     PARSER_ID = "default"
 

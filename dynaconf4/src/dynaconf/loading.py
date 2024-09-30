@@ -84,7 +84,9 @@ class LoadingManager:
         # optional env filtering
         used_envs = allowed_envs or list(env_data_map.keys())
         if allowed_envs:
-            env_data_map = {env:data for env,data in env_data_map.items() if env in allowed_envs}
+            env_data_map = {
+                env: data for env, data in env_data_map.items() if env in allowed_envs
+            }
 
         # state update
         for env in used_envs:

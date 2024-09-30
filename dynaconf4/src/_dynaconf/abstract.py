@@ -29,9 +29,11 @@ class BaseMergeTree:
     def __eq__(self, o):
         raise NotImplementedError()
 
+
 class BaseLoadRegistry:
     def get_loader(self, loader_id: str) -> Loader:
         raise NotImplementedError()
+
 
 class BaseOperation:
     """

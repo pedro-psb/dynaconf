@@ -1,6 +1,7 @@
 from _dynaconf.datastructures import LoadRequest
 from _dynaconf.load import load
 
+
 def test_load_with_no_root_level_envs():
     data = {"foo": "from-load-1"}
     load_request = LoadRequest(

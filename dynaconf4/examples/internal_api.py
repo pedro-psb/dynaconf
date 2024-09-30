@@ -17,7 +17,9 @@ def example_1():
     See test_merge.py for more in-depth reference.
     """
 
-    print_kwargs(base=base, income=income, result=result["root"], mtree=mtree, docs=docs)
+    print_kwargs(
+        base=base, income=income, result=result["root"], mtree=mtree, docs=docs
+    )
 
 
 if __name__ == "__main__":

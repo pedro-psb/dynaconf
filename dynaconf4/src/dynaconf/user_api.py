@@ -75,6 +75,7 @@ class EnvApi:
 def CompatDynaconf(*args, **kwargs):
     class Settings(NewDataDict):
         pass
+
     schema = parse_schema(Settings)
     options = Options()
     dynaconf_core = DynaconfCore(schema, options)
@@ -82,6 +83,7 @@ def CompatDynaconf(*args, **kwargs):
     settings = Settings()
     settings.__init_dynaconf__(dynaconf_api)
     return settings
+
 
 class CompatDynaconfApi:
     def __init__(self, dynaconf_core: DynaconfCore):
@@ -95,5 +97,3 @@ class CompatDynaconfApi:
 
     def __getitem__(self, key):
         return self.__dynaconf_core__.get_settings_data
-
-

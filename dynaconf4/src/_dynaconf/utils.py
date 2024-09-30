@@ -1,9 +1,11 @@
 from __future__ import annotations
 from rich import print as _print
 
+
 def print_kwargs(**kwargs):
-    for k,v in kwargs.items():
-        section_print(k,v)
+    for k, v in kwargs.items():
+        section_print(k, v)
+
 
 def section_print(name: str, data: dict | str):
     _print(name + ":")
@@ -13,6 +15,7 @@ def section_print(name: str, data: dict | str):
         pprint(data)
     else:
         _print(data)
+
 
 def pprint(obj: dict | list, indent=4):
     """Pretty print a container object with linebreak similar to json.dumps()."""

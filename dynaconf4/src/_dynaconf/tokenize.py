@@ -5,7 +5,9 @@ from _dynaconf.token_registry import TokenRegistry
 import re
 
 
-def tokenize(dynaconf_string: str, create_token: Callable) -> DynaconfToken:
+def tokenize(dynaconf_string: str, create_token: Callable) -> DynaconfToken | None:
+    if not is_token(dynaconf_string):
+        return None
 
     def split_string(s):
         pattern = r"(@[a-zA-Z0-9_-]+)"

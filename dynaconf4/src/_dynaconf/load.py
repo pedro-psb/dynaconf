@@ -4,7 +4,9 @@ from _dynaconf.abstract import BaseLoadRegistry
 EnvName = str
 
 
-def load(load_request: LoadRequest, load_registry: BaseLoadRegistry) -> dict[EnvName, dict]:
+def load(
+    load_request: LoadRequest, load_registry: BaseLoadRegistry
+) -> dict[EnvName, dict]:
     loader = load_registry.get_loader(load_request.loader_id)
     data = {}
     result = {"env": data}
