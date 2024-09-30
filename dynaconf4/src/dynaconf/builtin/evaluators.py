@@ -1,10 +1,11 @@
-from ..data_structs import DynaconfToken, SchemaTree, DynaconfTree
-
+from ..data_structs import SchemaTree
+from _dynaconf.datastructures import DynaconfToken
+from _dynaconf.abstract import BaseMergeTree
 
 class DefaultEvaluator:
     PARSER_ID = "default"
 
-    def parse_tree(self, data: dict, schema_tree: SchemaTree) -> DynaconfTree:
+    def parse_tree(self, data: dict, schema_tree: SchemaTree) -> BaseMergeTree:
         """Parse raw python data into dynaconf specific data-structures.
 
         The main structures are is the dynaconf tree (made of DataDict and DataList), which
@@ -28,7 +29,7 @@ class DefaultEvaluator:
     def _tokenize_dynaconf_string(self, dynaconf_string: str) -> DynaconfToken:
         raise NotImplementedError()  # TODO: implement
 
-    def evaluate_lazy_settigns(self, dynaconf_tree: DynaconfTree, context: dict):
+    def evaluate_lazy_settigns(self, merge_tree: BaseMergeTree, context: dict):
         """Evaluate lazy values in a DynaconfTree structure.
 
         Params:

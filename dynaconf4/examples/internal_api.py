@@ -1,5 +1,5 @@
-from internal_api import apply_merge_tree, create_merge_tree
-from internal_api.utils import section_print
+from _dynaconf import apply_merge_tree, create_merge_tree
+from _dynaconf.utils import section_print
 
 
 def example_1():

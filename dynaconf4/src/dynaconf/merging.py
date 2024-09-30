@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional
 
-from .data_structs import DynaconfTree
+from _dynaconf.abstract import BaseMergeTree
 
 if TYPE_CHECKING:
     from .dynaconf_options import SharedOptions
@@ -23,6 +23,6 @@ class MergingManager:
         self.options = opts
         self.shared_options = opts
 
-    def merge_data(self, base_data: DynaconfTree, income_data: DynaconfTree) -> None:
+    def merge_data(self, base_data: BaseMergeTree, income_data: BaseMergeTree) -> None:
         """Merges income_data into base_data in-place (mutates)."""
         raise NotImplementedError()

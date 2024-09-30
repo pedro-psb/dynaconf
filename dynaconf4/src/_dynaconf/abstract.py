@@ -2,7 +2,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
-    from internal_api.datastructures import TreePath, DynaconfToken
+    from _dynaconf.datastructures import TreePath, DynaconfToken, Loader
 
 
 class BaseMergeTree:
@@ -29,6 +29,9 @@ class BaseMergeTree:
     def __eq__(self, o):
         raise NotImplementedError()
 
+class BaseLoadRegistry:
+    def get_loader(self, loader_id: str) -> Loader:
+        raise NotImplementedError()
 
 class BaseOperation:
     """

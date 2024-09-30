@@ -1,10 +1,14 @@
 from __future__ import annotations
 from typing import NamedTuple, Sequence, Optional, Callable, TypeVar, Generic
-from internal_api.abstract import BaseOperation, BaseMergeTree
+from _dynaconf.abstract import BaseOperation, BaseMergeTree
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from internal_api.registry import Merge
+    from _dynaconf.token_registry import Merge
+
+TokenName = str
+EnvName = str
+T = TypeVar("T")
 
 
 def is_token(value: str) -> bool:
@@ -27,9 +31,56 @@ def ensure_rooted(_data: dict):
         return {"root": _data}
     return _data
         
+# loader related
 
-TokenName = str
+class Loader:
+    read: Callable
+    parse: Callable
+    split_envs: Callable
 
+
+class LoadRequest(NamedTuple):
+    loader_id: str
+    uri: str
+    order: int = 0
+    has_explicit_envs: Optional[bool] = None
+    allowed_env_list: Optional[list] = None
+    direct_data: Optional[dict] = None
+
+
+
+# linear data structures
+
+class LinearDataStructure(Generic[T]):
+    def __init__(self):
+        self._data = []
+
+    def is_empty(self) -> bool:
+        return len(self._data) == 0
+
+    def __repr__(self):
+        return repr(self._data)
+
+
+class Stack(LinearDataStructure[T]):
+    def pop(self) -> T:
+        return self._data.pop()
+
+    def push(self, item: T):
+        self._data.append(item)
+
+    def reverse(self):
+        self._data.reverse()
+
+
+class Queue(LinearDataStructure):
+    def dequeue(self):
+        return self._data.pop(0)
+
+    def enqueue(self, item):
+        self._data.insert(0, item)
+
+# trees related
 
 class TreePath(tuple):
     def as_str(self):
@@ -61,42 +112,6 @@ class DynaconfToken(NamedTuple):
 class TokenCallback(NamedTuple):
     fn: Callable
     lazy: bool = False
-
-
-# TODO: add generic types to these
-# https://mypy.readthedocs.io/en/stable/generics.html#defining-generic-classes
-
-T = TypeVar("T")
-
-
-class LinearDataStructure(Generic[T]):
-    def __init__(self):
-        self._data = []
-
-    def is_empty(self) -> bool:
-        return len(self._data) == 0
-
-    def __repr__(self):
-        return repr(self._data)
-
-
-class Stack(LinearDataStructure[T]):
-    def pop(self) -> T:
-        return self._data.pop()
-
-    def push(self, item: T):
-        self._data.append(item)
-
-    def reverse(self):
-        self._data.reverse()
-
-
-class Queue(LinearDataStructure):
-    def dequeue(self):
-        return self._data.pop(0)
-
-    def enqueue(self, item):
-        self._data.insert(0, item)
 
 
 class MergeTree(BaseMergeTree):

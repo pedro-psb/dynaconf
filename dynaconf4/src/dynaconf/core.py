@@ -1,6 +1,8 @@
 import pluggy
 
-from .data_structs import DataDict, LoadRequest, SchemaTree, Stack, DynaconfTree
+from .data_structs import DataDict, SchemaTree, Stack
+from _dynaconf.datastructures import LoadRequest
+from _dynaconf.abstract import BaseMergeTree
 from .dynaconf_options import Options
 from .environment import EnvManager
 from .loading import LoadingManager
@@ -31,8 +33,8 @@ class DynaconfCore:
 
         # state
         self._load_request_stack: Stack[LoadRequest] = Stack[LoadRequest]()
-        self._loaded_data_stack: dict[str, Stack[DynaconfTree]] = defaultdict(
-            default_factory=Stack[DynaconfTree]  # type: ignore
+        self._loaded_data_stack: dict[str, Stack[BaseMergeTree]] = defaultdict(
+            default_factory=Stack[BaseMergeTree]  # type: ignore
         )
 
     def setup_plugins(self) -> None:

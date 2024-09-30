@@ -4,7 +4,8 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Optional
 
 from .builtin.loaders import DirectLoader, EnvironLoader, SqliteLoader, TomlLoader
-from .data_structs import LoadRequest, EnvName
+from .data_structs import EnvName
+from _dynaconf.datastructures import LoadRequest
 
 from .hookspec import ResourceLoader
 

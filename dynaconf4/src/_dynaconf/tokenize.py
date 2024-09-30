@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Callable
-from internal_api.datastructures import DynaconfToken, PartialToken, Stack, is_token
-from internal_api.registry import TokenRegistry
+from _dynaconf.datastructures import DynaconfToken, PartialToken, Stack, is_token
+from _dynaconf.token_registry import TokenRegistry
 import re
 
 

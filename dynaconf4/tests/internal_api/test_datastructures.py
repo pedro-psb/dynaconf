@@ -1,4 +1,4 @@
-from internal_api.registry import Add
+from _dynaconf.token_registry import Add
 
 
 def test_equallity():

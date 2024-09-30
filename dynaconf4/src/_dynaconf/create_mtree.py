@@ -1,7 +1,7 @@
 import functools
 from typing import Any, Callable, NamedTuple, Optional
 
-from internal_api.datastructures import (
+from _dynaconf.datastructures import (
     DynaconfToken,
     Stack,
     TreePath,
@@ -9,10 +9,10 @@ from internal_api.datastructures import (
     ensure_rooted,
     MergeTree,
 )
-from internal_api.abstract import BaseOperation, BaseMergeTree
-from internal_api.registry import Replace, get_builtin_token_operation_map
+from _dynaconf.abstract import BaseOperation, BaseMergeTree
+from _dynaconf.token_registry import Replace, get_builtin_token_operation_map
 
-from internal_api.tokenize import TokenRegistry, create_token, tokenize
+from _dynaconf.tokenize import TokenRegistry, create_token, tokenize
 
 
 class Item(NamedTuple):

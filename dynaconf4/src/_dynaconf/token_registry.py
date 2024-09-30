@@ -1,5 +1,5 @@
-from internal_api.datastructures import TokenCallback, TokenName
-from internal_api.abstract import BaseOperation
+from _dynaconf.datastructures import TokenCallback, TokenName
+from _dynaconf.abstract import BaseOperation
 
 
 class TokenRegistry:

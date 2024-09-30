@@ -93,4 +93,7 @@ class CompatDynaconfApi:
 
     def as_dict(self): ...
 
+    def __getitem__(self, key):
+        return self.__dynaconf_core__.get_settings_data
+
 

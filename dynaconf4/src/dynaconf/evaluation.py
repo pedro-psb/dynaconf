@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Optional, Callable
 
-from .data_structs import SchemaTree, DynaconfTree
+from .data_structs import SchemaTree
+from _dynaconf.abstract import BaseMergeTree
 from .builtin.evaluators import DefaultEvaluator
-from .builtin.transformers import builtin_transformers_map
 from dataclasses import dataclass
 
 if TYPE_CHECKING:
@@ -42,7 +42,7 @@ class EvaluationManager:
         # TODO: validate that it subclasses the BaseEvalutor
         self.evaluator = evaluator_instance
 
-    def parse_tree(self, data: dict, schema_tree: SchemaTree) -> DynaconfTree:
+    def parse_tree(self, data: dict, schema_tree: SchemaTree) -> BaseMergeTree:
         """Parse a raw dict into a dynaconf tree, composed of DataDict and DataList.
 
         These objects contains private internal data to support merging strategies, lazy
@@ -50,6 +50,6 @@ class EvaluationManager:
         """
         return self.evaluator.parse_tree(data, schema_tree)
 
-    def evalute_lazy_values(self, dynaconf_tree: DynaconfTree, context: dict):
+    def evalute_lazy_values(self, dynaconf_tree: BaseMergeTree, context: dict):
         """Evaluate lazy values from tree, if there are any."""
         self.evaluator.evaluate_lazy_settigns(dynaconf_tree, context)
