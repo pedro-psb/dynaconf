@@ -1,8 +1,15 @@
 from __future__ import annotations
+
 from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
-    from _dynaconf.datastructures import TreePath, DynaconfToken, Loader
+    from _dynaconf.datastructures import DynaconfToken, Loader, TreePath
+
+
+class BaseSchemaTree:
+    def get_key_type(self, key: str | int) -> None | type:
+        """Get key type or None if not present."""
+        raise NotImplementedError()
 
 
 class BaseMergeTree:

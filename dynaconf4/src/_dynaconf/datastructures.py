@@ -38,7 +38,7 @@ def ensure_rooted(_data: dict):
 # loader related
 
 
-class Loader:
+class Loader(NamedTuple):
     read: Callable
     parse: Callable
     split_envs: Callable
