@@ -74,6 +74,10 @@ def create_merge_tree(
 
     default_terminal_operation = Replace
 
+    # TODO: implement this properly
+    def is_token_merge_operation(op):
+        return True
+
     def traverse_container(
         container_path: TreePath,
         key: str | int,
@@ -83,33 +87,58 @@ def create_merge_tree(
         if isinstance(value, dict | list):
             for k, v in items(value):
                 traverse_container(container_path + key, k, v)
+            return
+
         # case: value is terminal value
-        elif token := tokenize_fn(value):
+        token_operation = None
+        if token := tokenize_fn(value):
             if token.meta is True:
                 mtree_add_meta_token_fn(container_path, token)
                 return
-            item_operation = evaluate(token, key)
-            mtree_add_fn(container_path, item_operation)
-        else:
-            merge_operation = default_terminal_operation
-            mtree_add_fn(container_path, merge_operation(key, value))
+            token_operation, evaluated = evaluate(token, key)
+            value = evaluated or value
+
+        # priority merge resolution
+        container_level_operation = first(mtree_get_meta_token_fn(container_path))
+        merge_operation = (
+            token_operation or container_level_operation or default_terminal_operation
+        )
+        mtree_add_fn(container_path, merge_operation(key, value))
 
     data = ensure_rooted(data)
     traverse_container(TreePath(), "root", data["root"])
     return mtree
 
 
-def evaluate(token: DynaconfToken, key: str | int):
+def first(sequence):
+    if sequence:
+        return sequence[0]
+    return None
+
+
+def evaluate(
+    token: DynaconfToken, key: str | int
+) -> tuple[type[BaseOperation] | None, Any]:
+    """Evaluate DynaconfToken.
+
+    Returns a tuple of (merge_operation, value)
+    """
     next_token: DynaconfToken | None = token
     value = None
+    merge_operation = None
     while next_token:
         if isinstance(next_token.fn, type) and issubclass(next_token.fn, BaseOperation):
-            return next_token.fn(key, value)
+            if next_token.next:
+                raise ValueError(
+                    f"BaseOperation should be the left-most token: {next_token.fn!r}"
+                )
+            merge_operation = next_token.fn
+            break
         value = next_token.fn(
             next_token.args, cumulative=value
         )  # TODO: add proper types to those callables
         next_token = next_token.next
-    return value
+    return merge_operation, value
 
 
 def items(container):
