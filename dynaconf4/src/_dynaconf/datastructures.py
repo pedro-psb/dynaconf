@@ -94,6 +94,9 @@ class TreePath(tuple):
         else:
             TypeError("Type not supported.")
 
+    def __repr__(self):
+        return f"{self.__class__.__name__}{super().__repr__()}"
+
 
 class PartialToken(NamedTuple):
     id: str

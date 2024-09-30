@@ -1,5 +1,5 @@
 from _dynaconf import apply_merge_tree, create_merge_tree
-from _dynaconf.utils import section_print
+from _dynaconf.utils import print_kwargs
 
 
 def example_1():
@@ -10,12 +10,14 @@ def example_1():
     }
     mtree = create_merge_tree(income)
     result = apply_merge_tree(base, mtree)
-    docs = """See test_merge.py for more in-depth reference."""
+    docs = """\
+    * 'income.key_a' is a no-op, because '@add' token's callback only applies in 'income_only' case.
+    * 'income.key_b' replaces 'base.key_b', because replace is the default behavior for Terminal values 'conflict' case.
 
-    section_print(base=base)
-    section_print(income=income)
-    section_print(result=result["root"])
-    section_print(docs=docs)
+    See test_merge.py for more in-depth reference.
+    """
+
+    print_kwargs(base=base, income=income, result=result["root"], mtree=mtree, docs=docs)
 
 
 if __name__ == "__main__":
