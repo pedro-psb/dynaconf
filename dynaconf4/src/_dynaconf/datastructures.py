@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import NamedTuple, Sequence, Optional, Callable, TypeVar, Generic
-from _dynaconf.abstract import BaseOperation, BaseMergeTree
+from _dynaconf.abstract import BaseOperation, BaseMergeTree, BaseSchemaTree
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -43,11 +43,11 @@ class Loader(NamedTuple):
     parse: Callable
     split_envs: Callable
 
-class LoadContext:
-    default_env_name: str
-    envvar_prefix: str
-    allowed_envs: list[str]
-    schema_tree: BaseSchemaTree
+class LoadContext(NamedTuple):
+    default_env_name: str = None
+    envvar_prefix: str = None
+    allowed_envs: list[str] = None
+    schema_tree: BaseSchemaTree = None
     only_schema_keys: bool = True
 
 
@@ -59,6 +59,10 @@ class LoadRequest(NamedTuple):
     has_explicit_envs: Optional[bool] = None
     allowed_env_list: Optional[list] = None
     direct_data: Optional[dict] = None
+
+class SchemaTree(BaseSchemaTree):
+    def get_key_type(self, key):
+        return str
 
 
 # linear data structures

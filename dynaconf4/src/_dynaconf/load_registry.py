@@ -9,6 +9,7 @@ class LoaderRegistry(BaseLoadRegistry):
     def __init__(self):
         self._loaders = {
             "builtin.direct": load_direct,
+            "builtin.environ": load_environ,
         }
 
     def get_loader(self, loader_id: str) -> Loader:
@@ -25,10 +26,12 @@ def load_direct(load_request: LoadRequest, load_context: LoadContext):
     return load_request.direct_data
 
 
-def load_envvar(load_request: LoadRequest, load_context: LoadContext):
+def load_environ(load_request: LoadRequest, load_context: LoadContext):
     import os
 
     schema_tree = load_context.schema_tree
+    prefix = "dynaconf_"
+    strict_lower = True
 
     def cast_int(k):
         try:
@@ -38,29 +41,30 @@ def load_envvar(load_request: LoadRequest, load_context: LoadContext):
 
     def process_key(key: str) -> TreePath:
         keys = []
-        for k in key.split():
-            _k = cast_int(k) if schema_tree.get_key_type(k) is int else k
+        no_prefix = key[len(prefix):]
+        for k in no_prefix.split("__"):
+            _k = cast_int(k) if schema_tree.get_key_type(k) is int else k.lower()
             keys.append(_k)
         return TreePath(keys)
 
-    def process_value(key: str) -> Any:
-        raise NotImplementedError()
+    def process_value(value: str) -> Any:
+        return value
 
     def treefy_map(data_map: list[tuple[TreePath, Any]]) -> dict[str | int, Any]:
-        tree = {}
-
-        def add_to_tree(keys, value):
+        def add_to_tree(tree, keys, value):
             # Recursively build the tree structure
             for key in keys[:-1]:
                 tree = tree.setdefault(key, {})
             tree[keys[-1]] = value
 
+        tree = {}
         for keys, value in data_map:
-            add_to_tree(keys, value)
+            add_to_tree(tree, keys, value)
         return tree
 
+    # TODO: filter env by prefix
     dynaconf_data_map = [
-        (process_key(k), process_value(v)) for k, v in os.environ.items()
+        (process_key(k), process_value(v)) for k, v in os.environ.items() if k.lower().startswith(prefix)
     ]
     return treefy_map(dynaconf_data_map)
 
