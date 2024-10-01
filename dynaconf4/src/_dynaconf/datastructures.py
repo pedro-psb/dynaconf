@@ -43,6 +43,14 @@ class Loader(NamedTuple):
     parse: Callable
     split_envs: Callable
 
+class LoadContext:
+    default_env_name: str
+    envvar_prefix: str
+    allowed_envs: list[str]
+    schema_tree: BaseSchemaTree
+    only_schema_keys: bool = True
+
+
 
 class LoadRequest(NamedTuple):
     loader_id: str
