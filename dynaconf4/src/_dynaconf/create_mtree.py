@@ -1,35 +1,23 @@
 import functools
-from typing import Any, Callable, NamedTuple, Optional
+from typing import Any
 
 from _dynaconf.datastructures import (
     DynaconfToken,
-    Stack,
     TreePath,
-    is_token,
     ensure_rooted,
     MergeTree,
 )
 from _dynaconf.abstract import BaseOperation, BaseMergeTree
-from _dynaconf.token_registry import Replace, get_builtin_token_operation_map
+from _dynaconf.token_registry import Replace
 
-from _dynaconf.tokenize import TokenRegistry, create_token, tokenize
-
-
-class Item(NamedTuple):
-    container_path: TreePath
-    key: str | int
-    value: Any
-
-
-class ContextChange(NamedTuple):
-    new_container_path: TreePath
-    new_container_type: dict | list
+from _dynaconf.tokenize import TokenRegistry, tokenize
 
 
 def create_merge_tree(
     data: dict,
     mtree_cls: type[BaseMergeTree] = MergeTree,
     token_registry: TokenRegistry = TokenRegistry(),
+    # merge_policy: BaseMergePolicy = MergePolicy(),
 ):
     """Create a MergeTree instance from a @data tree.
 
@@ -38,72 +26,46 @@ def create_merge_tree(
 
     container-level token example: `"listy": [1,2,3, "@merge_unique"]`
     terminal-level token example: `"leafy": "@int 123"`
+
+    Args:
+        data: The data that will be used to create the merge tree from.
+        mtree_cls: The MergeTree class implementation that will be used. This should
+            be a subclass of BaseMergeTree.
+        token_registry: The object containing the token_id:token_callback relationship.
     """
+
+    # prepare tokenize and mtree
+    tokenize_fn = functools.partial(tokenize, token_registry=token_registry)
     mtree = mtree_cls()
 
-    # handler functions
-    create_token_fn = functools.partial(create_token, token_registry=token_registry)
-    tokenize_fn = functools.partial(tokenize, create_token=create_token_fn)
-
-    def get_operation(token_id: str) -> type[BaseOperation]:
-        token_op_map = get_builtin_token_operation_map()
-        try:
-            return token_op_map[token_id]
-        except KeyError:
-            raise KeyError(f"The token_id doesnt exist: {token_id}")
-
-    def mtree_add_fn(path, item):
-        mtree.add(path, item)  # noqa
-
-    def mtree_add_meta_token_fn(path, token):
-        if token:
-            mtree.add_meta_token(path, token)  # noqa
-
-    def mtree_get_meta_token_fn(path, token_id: Optional[str] = None):
-        return mtree.get_meta_token(path, token_id)  # noqa
-
-    # state
-
-    # default_container_merge_policy = True
-    # default_container_merge_operation = (
-    #     Merge if default_container_merge_policy else None
-
-    # merge_token_list = mtree_get_token_fn(item_path, "merge")
-    # container_level_merge_operation = merge_token_list[0] if merge_token_list else None
-    # merge_operation = container_level_merge_operation or default_container_merge_operation
-
     default_terminal_operation = Replace
-
-    # TODO: implement this properly
-    def is_token_merge_operation(op):
-        return True
 
     def traverse_container(
         container_path: TreePath,
         key: str | int,
         value: Any,
     ):
-        # case: value is container
+        # Recursive case: value is container
         if isinstance(value, dict | list):
             for k, v in items(value):
                 traverse_container(container_path + key, k, v)
             return
 
-        # case: value is terminal value
+        # Base case: value is terminal
         token_operation = None
         if token := tokenize_fn(value):
             if token.meta is True:
-                mtree_add_meta_token_fn(container_path, token)
+                mtree.add_meta_token(container_path, token)
                 return
             token_operation, evaluated = evaluate(token, key)
             value = evaluated or value
 
         # priority merge resolution
-        container_level_operation = first(mtree_get_meta_token_fn(container_path))
+        container_level_operation = first(mtree.get_meta_token(container_path))
         merge_operation = (
             token_operation or container_level_operation or default_terminal_operation
         )
-        mtree_add_fn(container_path, merge_operation(key, value))
+        mtree.add(container_path, merge_operation(key, value))
 
     data = ensure_rooted(data)
     traverse_container(TreePath(), "root", data["root"])
@@ -111,6 +73,7 @@ def create_merge_tree(
 
 
 def first(sequence):
+    """Returns the first element of a sequence or None."""
     if sequence:
         return sequence[0]
     return None

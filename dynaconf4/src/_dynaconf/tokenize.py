@@ -1,11 +1,12 @@
 from __future__ import annotations
-from typing import Callable
 from _dynaconf.datastructures import DynaconfToken, PartialToken, Stack, is_token
 from _dynaconf.token_registry import TokenRegistry
 import re
 
 
-def tokenize(dynaconf_string: str, create_token: Callable) -> DynaconfToken | None:
+def tokenize(
+    dynaconf_string: str, token_registry: TokenRegistry
+) -> DynaconfToken | None:
     if not is_token(dynaconf_string):
         return None
 
@@ -32,11 +33,13 @@ def tokenize(dynaconf_string: str, create_token: Callable) -> DynaconfToken | No
     # 2. Create the final token
     # Now we need to use external context and chain each token with the next
     # partial_token_stack.reverse()
-    first_token = create_token(partial_token_stack.pop(), None)  # in evaluation order
+    first_token = create_token(
+        partial_token_stack.pop(), None, token_registry
+    )  # in evaluation order
     next_token = first_token
     while not partial_token_stack.is_empty():
         next_partial = partial_token_stack.pop()
-        next_token = create_token(next_partial, next_token)
+        next_token = create_token(next_partial, next_token, token_registry)
     return next_token
 
 

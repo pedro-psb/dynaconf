@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, Callable
 
 if TYPE_CHECKING:
-    from _dynaconf.datastructures import DynaconfToken, Loader, TreePath
+    from _dynaconf.datastructures import DynaconfToken, TreePath
 
 
 class BaseSchemaTree:
@@ -38,7 +38,7 @@ class BaseMergeTree:
 
 
 class BaseLoadRegistry:
-    def get_loader(self, loader_id: str) -> Loader:
+    def get_loader(self, loader_id: str) -> Callable:
         raise NotImplementedError()
 
 

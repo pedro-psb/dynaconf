@@ -56,10 +56,9 @@ def test_load(scenario: Scenario, monkeypatch):
     with monkeypatch.context() as m:
         # mock environ
         if scenario.envvar_data:
-            for k,v in scenario.envvar_data.items():
-                m.setenv(k,v)
+            for k, v in scenario.envvar_data.items():
+                m.setenv(k, v)
         # test
         result = load(scenario.load_request, load_registry, load_context)
         for env, data in scenario.expected.items():
             assert result[env] == data
-

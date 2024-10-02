@@ -41,7 +41,7 @@ def load_environ(load_request: LoadRequest, load_context: LoadContext):
 
     def process_key(key: str) -> TreePath:
         keys = []
-        no_prefix = key[len(prefix):]
+        no_prefix = key[len(prefix) :]
         for k in no_prefix.split("__"):
             _k = cast_int(k) if schema_tree.get_key_type(k) is int else k.lower()
             keys.append(_k)
@@ -63,7 +63,9 @@ def load_environ(load_request: LoadRequest, load_context: LoadContext):
         return tree
 
     dynaconf_data_map = [
-        (process_key(k), process_value(v)) for k, v in os.environ.items() if k.lower().startswith(prefix)
+        (process_key(k), process_value(v))
+        for k, v in os.environ.items()
+        if k.lower().startswith(prefix)
     ]
     return treefy_map(dynaconf_data_map)
 

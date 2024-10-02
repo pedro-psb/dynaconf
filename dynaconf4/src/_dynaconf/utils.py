@@ -5,6 +5,7 @@ import functools
 
 # _print = rich.print
 
+
 def print_kwargs(**kwargs):
     for k, v in kwargs.items():
         section_print(k, v)
@@ -12,7 +13,9 @@ def print_kwargs(**kwargs):
 
 def section_print(name: str, data: dict | str):
     if not isinstance(data, str):
-        rich.print(rich.panel.Panel(rich.pretty.Pretty(data, expand_all=True), title=name))
+        rich.print(
+            rich.panel.Panel(rich.pretty.Pretty(data, expand_all=True), title=name)
+        )
     else:
         rich.print(rich.panel.Panel(data, title=name))
 

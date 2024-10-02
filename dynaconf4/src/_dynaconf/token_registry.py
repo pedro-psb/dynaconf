@@ -1,4 +1,4 @@
-from _dynaconf.datastructures import TokenCallback, TokenName
+from _dynaconf.datastructures import TokenCallback
 from _dynaconf.abstract import BaseOperation
 
 
@@ -25,17 +25,6 @@ class TokenRegistry:
         if not callback:
             raise RuntimeError(f"No TokenCallback registered for token: {token_id!r}")
         return callback
-
-
-def get_builtin_token_operation_map() -> dict[TokenName, type[BaseOperation]]:
-    token_op_map: dict[str, type[BaseOperation]] = {
-        "merge": Merge,
-        "add": Add,
-        "replace": Replace,
-        "append": Append,
-        "append_unique": AppendUnique,
-    }
-    return token_op_map
 
 
 class DefaultOperation(BaseOperation):

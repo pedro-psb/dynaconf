@@ -7,7 +7,9 @@ EnvName = str
 
 
 def load(
-    load_request: LoadRequest, load_registry: BaseLoadRegistry, load_context: LoadContext
+    load_request: LoadRequest,
+    load_registry: BaseLoadRegistry,
+    load_context: LoadContext,
 ) -> dict[EnvName, dict]:
     default_env = "default"  # TODO: move this to a better place and pass it over
     # TODO: where default comes from?

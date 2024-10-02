@@ -1,7 +1,6 @@
-from _dynaconf.create_mtree import tokenize, TokenRegistry, create_token
+from _dynaconf.create_mtree import tokenize, TokenRegistry
 from _dynaconf.datastructures import DynaconfToken
 from dataclasses import dataclass
-import functools
 import pytest
 import rich
 
@@ -71,7 +70,6 @@ def debug_diff(result, expected):
 
 @pytest.mark.parametrize("case", cases)
 def test_tokenizer(case):
-    _create_token = functools.partial(create_token, token_registry=token_registry)
-    result = tokenize(case.input, _create_token)
+    result = tokenize(case.input, token_registry)
     debug_diff(result, case.expected)
     assert result == case.expected
