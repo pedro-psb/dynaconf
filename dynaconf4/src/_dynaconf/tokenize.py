@@ -49,12 +49,12 @@ def create_token(
     token_registry: TokenRegistry,
 ) -> DynaconfToken:
     token_callback = token_registry.get_callback(partial_token.id)
-    is_meta_token = False
+    is_container_level = False
     return DynaconfToken(
         id=partial_token.id,
         args=partial_token.args or None,
-        lazy=token_callback.lazy,
         fn=token_callback.fn,
-        meta=is_meta_token,
+        is_lazy=token_callback.is_lazy,
+        is_container_level=is_container_level,
         next=next,
     )

@@ -23,7 +23,9 @@ cases = [
     Case(
         id="[T,A]",
         input="@int 123",
-        expected=DynaconfToken(id="int", args="123", lazy=False, fn=int_fn, next=None),
+        expected=DynaconfToken(
+            id="int", args="123", is_lazy=False, fn=int_fn, next=None
+        ),
     ),
     Case(
         id="[T,T,A]",
@@ -31,12 +33,12 @@ cases = [
         expected=DynaconfToken(
             id="sum",
             args="5 5 5 5",
-            lazy=False,
+            is_lazy=False,
             fn=sum_fn,
             next=DynaconfToken(
                 id="str",
                 args=None,
-                lazy=False,
+                is_lazy=False,
                 fn=str_fn,
                 next=None,
             ),
@@ -48,12 +50,12 @@ cases = [
         expected=DynaconfToken(
             id="sum",
             args="5 5 5 5",
-            lazy=False,
+            is_lazy=False,
             fn=sum_fn,
             next=DynaconfToken(
                 id="str",
                 args="foobar",
-                lazy=False,
+                is_lazy=False,
                 fn=str_fn,
                 next=None,
             ),

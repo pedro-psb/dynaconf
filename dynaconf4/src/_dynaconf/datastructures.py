@@ -34,7 +34,9 @@ def ensure_rooted(_data: dict):
         return {"root": _data}
     return _data
 
+
 # dynaconf data objects
+
 
 class DataDict(dict):
     def __init__(self, *args, **kwargs):
@@ -55,6 +57,7 @@ class DataDict(dict):
 
 
 class DataList(list): ...
+
 
 # loader related
 
@@ -147,15 +150,16 @@ class PartialToken(NamedTuple):
 class DynaconfToken(NamedTuple):
     id: str
     args: Optional[str]
-    lazy: bool
+    is_lazy: bool
     fn: Callable
     next: Optional[DynaconfToken]
-    meta: bool = False
+    is_container_level: bool = False
 
 
 class TokenCallback(NamedTuple):
     fn: Callable
-    lazy: bool = False
+    is_lazy: bool = False
+    is_merge_operation: bool = False
 
 
 class MergeTree(BaseMergeTree):
@@ -211,7 +215,10 @@ class MergeTree(BaseMergeTree):
 
 
 class MergeTree2(BaseMergeTree):
-    """Example of doing a different implementation opaquely."""
+    """Example of doing a different implementation.
+
+    Implemeting all base class methods should make it work seamingless.
+    """
 
     def __init__(self, root: Merge):
         self._tree = root
