@@ -34,6 +34,27 @@ def ensure_rooted(_data: dict):
         return {"root": _data}
     return _data
 
+# dynaconf data objects
+
+class DataDict(dict):
+    def __init__(self, *args, **kwargs):
+        self.__dynaconf_data = {
+            "validators": None,
+            "lazy_operations": [],
+        }
+        super().__init__(*args, **kwargs)
+
+    def __init_dynaconf__(self, dynaconf_api):
+        self.__dynaconf_data__["dynaconf_api"] = dynaconf_api
+
+    def get_dynaconf(self):
+        dynaconf_api = self.__dynaconf_data__.get("dynaconf_api", None)
+        if not dynaconf_api:
+            raise RuntimeError("Dynaconf not initialized.")
+        return dynaconf_api
+
+
+class DataList(list): ...
 
 # loader related
 
