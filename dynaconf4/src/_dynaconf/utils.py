@@ -1,6 +1,9 @@
 from __future__ import annotations
-from rich import print as _print
+import rich.pretty
+import rich.panel
+import functools
 
+# _print = rich.print
 
 def print_kwargs(**kwargs):
     for k, v in kwargs.items():
@@ -8,45 +11,15 @@ def print_kwargs(**kwargs):
 
 
 def section_print(name: str, data: dict | str):
-    _print(name + ":")
-    if isinstance(data, str):
-        _print(data)
-    elif isinstance(data, dict):
-        pprint(data)
+    if not isinstance(data, str):
+        rich.print(rich.panel.Panel(rich.pretty.Pretty(data, expand_all=True), title=name))
     else:
-        _print(data)
+        rich.print(rich.panel.Panel(data, title=name))
 
 
 def pprint(obj: dict | list, indent=4):
     """Pretty print a container object with linebreak similar to json.dumps()."""
-
-    def _pprint(_data, indent=4, level=0):
-        spacing = " " * (level * indent)
-
-        if isinstance(_data, dict):
-            _print("{")
-            for i, (key, value) in enumerate(_data.items()):
-                _print(f'{spacing}{indent * " "}"{key}": ', end="")
-                if isinstance(value, (dict, list)):
-                    _pprint(value, indent, level + 1)
-                else:
-                    _print(f'{repr(value)}{"," if i < len(_data) - 1 else ""}')
-            closing_bracket = "%s}" if level == 0 else "%s},"
-            _print(closing_bracket % spacing)
-
-        elif isinstance(_data, list):
-            _print("[")
-            for i, item in enumerate(_data):
-                _print(f'{spacing}{indent * " "}', end="")
-                if isinstance(item, (dict, list)):
-                    _pprint(item, indent, level + 1)
-                else:
-                    _print(f'{repr(item)}{"," if i < len(_data) - 1 else ""}')
-            closing_bracket = "%s]" if level == 0 else "%s],"
-            _print(closing_bracket % spacing)
-
-    _pprint(obj)
-    print()
+    rich.print(rich.pretty.Pretty(obj, expand_all=True))
 
 
 if __name__ == "__main__":

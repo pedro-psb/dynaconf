@@ -62,7 +62,6 @@ def load_environ(load_request: LoadRequest, load_context: LoadContext):
             add_to_tree(tree, keys, value)
         return tree
 
-    # TODO: filter env by prefix
     dynaconf_data_map = [
         (process_key(k), process_value(v)) for k, v in os.environ.items() if k.lower().startswith(prefix)
     ]
