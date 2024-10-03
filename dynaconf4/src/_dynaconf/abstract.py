@@ -12,6 +12,17 @@ class BaseSchemaTree:
         raise NotImplementedError()
 
 
+# TODO: generalize this structure.
+# It should store all types of operations ("terminal" and "container") and lazy tokens.
+# Maybe:
+# mtree.add_operation(operation_type, path, value)
+# mtree.get_operation(operation_type, path)
+# mtree.add_lazy_tokens(path, lazy_token)
+# mtree.get_lazy_token(path)
+# or
+# mtree.add(item_type: terminal_op|container_op|lazy_token, path, value)
+# mtree.get(item_type: (...^) , path)
+# mtree.iter(item_type: (...^))
 class BaseMergeTree:
     def get(self, path: TreePath):
         raise NotImplementedError()

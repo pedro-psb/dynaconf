@@ -33,11 +33,7 @@ def create_merge_tree(
             be a subclass of BaseMergeTree.
         token_registry: The object containing the token_id:token_callback relationship.
     """
-
-    # prepare tokenize and mtree
-    tokenize_fn = functools.partial(tokenize, token_registry=token_registry)
     mtree = mtree_cls()
-
     default_terminal_operation = Replace
 
     def traverse_container(
@@ -53,8 +49,8 @@ def create_merge_tree(
 
         # Base case: value is terminal
         token_operation = None
-        if token := tokenize_fn(value):
-            if token.meta is True:
+        if token := tokenize(value, token_registry):
+            if token.is_container_level is True or token.is_lazy:
                 mtree.add_meta_token(container_path, token)
                 return
             token_operation, evaluated = evaluate(token, key)

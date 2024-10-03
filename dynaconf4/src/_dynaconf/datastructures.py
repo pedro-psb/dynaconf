@@ -42,7 +42,7 @@ class DataDict(dict):
     def __init__(self, *args, **kwargs):
         self.__dynaconf_data = {
             "validators": None,
-            "lazy_operations": [],
+            "lazy_tokens": [],
         }
         super().__init__(*args, **kwargs)
 

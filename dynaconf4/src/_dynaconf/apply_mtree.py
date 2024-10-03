@@ -25,6 +25,9 @@ def apply_merge_tree(
     _data = base if mutate_base is True else deepcopy(base)
     _data = ensure_rooted(_data)
 
+    # TODO: implement lazy_tokens injection here
+    # The tokens are carried over by the MergeTree and should be stored in
+    # DataDict.__internal_data__["lazy_tokens"]
     def step_in(container: dict | list, path: TreePath):
         container_ops = merge_tree.get(path) or []
         # apply all operation on current container items
