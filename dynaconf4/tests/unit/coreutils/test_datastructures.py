@@ -1,4 +1,4 @@
-from _dynaconf.token_registry import Add
+from _dynaconf.coreutils.token_registry import Add
 
 
 def test_equallity():

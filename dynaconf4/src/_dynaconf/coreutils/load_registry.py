@@ -2,7 +2,7 @@ from typing import Any, Callable
 
 from _dynaconf.abstract import BaseLoadRegistry, BaseSchemaTree
 from _dynaconf.datastructures import Loader, LoadRequest, TreePath, LoadContext
-from _dynaconf.load import split_envs
+from .load import split_envs
 
 
 class LoaderRegistry(BaseLoadRegistry):

@@ -1,4 +1,4 @@
-from _dynaconf.create_mtree import tokenize, TokenRegistry
+from _dynaconf.coreutils import tokenize, TokenRegistry
 from _dynaconf.datastructures import DynaconfToken
 from dataclasses import dataclass
 import pytest

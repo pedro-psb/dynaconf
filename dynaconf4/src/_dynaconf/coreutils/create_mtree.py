@@ -1,4 +1,3 @@
-import functools
 from typing import Any
 
 from _dynaconf.datastructures import (
@@ -8,9 +7,8 @@ from _dynaconf.datastructures import (
     MergeTree,
 )
 from _dynaconf.abstract import BaseOperation, BaseMergeTree
-from _dynaconf.token_registry import Replace
-
-from _dynaconf.tokenize import TokenRegistry, tokenize
+from .token_registry import Replace, TokenRegistry
+from .tokenize import tokenize
 
 
 def create_merge_tree(

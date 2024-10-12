@@ -1,6 +1,6 @@
 from _dynaconf.datastructures import LoadRequest, LoadContext, SchemaTree
-from _dynaconf.load import load
-from _dynaconf.load_registry import LoaderRegistry
+from _dynaconf.coreutils import load
+from _dynaconf.coreutils import LoaderRegistry
 from dataclasses import dataclass
 import pytest
 

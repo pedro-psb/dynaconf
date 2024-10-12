@@ -2,9 +2,9 @@ from dataclasses import dataclass
 
 import pytest
 
-from _dynaconf.apply_mtree import apply_merge_tree
-from _dynaconf.create_mtree import create_merge_tree
-from _dynaconf.token_registry import (
+from _dynaconf.coreutils import apply_merge_tree
+from _dynaconf.coreutils import create_merge_tree
+from _dynaconf.coreutils.token_registry import (
     Add,
     Append,
     AppendUnique,

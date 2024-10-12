@@ -3,7 +3,7 @@ from __future__ import annotations
 from copy import deepcopy
 
 from _dynaconf.datastructures import BaseMergeTree, TreePath, ensure_path, ensure_rooted
-from _dynaconf.token_registry import Merge, JumpMerge
+from .token_registry import Merge, JumpMerge
 
 
 def apply_merge_tree(

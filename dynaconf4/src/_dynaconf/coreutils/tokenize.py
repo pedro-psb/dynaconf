@@ -1,6 +1,6 @@
 from __future__ import annotations
 from _dynaconf.datastructures import DynaconfToken, PartialToken, Stack, is_token
-from _dynaconf.token_registry import TokenRegistry
+from .token_registry import TokenRegistry
 import re
 
 
