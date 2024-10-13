@@ -1,9 +1,14 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional, Callable
+from typing import TYPE_CHECKING, Optional, Callable, Any, Sequence
 
 if TYPE_CHECKING:
     from _dynaconf.datastructures import DynaconfToken, TreePath
+
+
+class BaseOptions:
+    def print(self):
+        raise NotImplementedError()
 
 
 class BaseSchemaTree:
@@ -97,4 +102,106 @@ class BaseOperation:
         raise NotImplementedError()
 
     def __eq__(selef, o):
+        raise NotImplementedError()
+
+
+class BaseValidator:
+    """Holds the conditions that should apply to @names and also the validation logic."""
+
+    def __init__(
+        self,
+        *names: str,
+        messages: dict[str, str] | None = None,
+        items_validators: list[BaseValidator] | None = None,
+        items_lookup: Callable[[Any], Any] | None = None,
+        description: str | None = None,
+        # conditions
+        must_exist: bool | None = None,
+        required: bool | None = None,
+        condition: Callable[[Any], bool] | None = None,
+        when: BaseValidator | None = None,
+        env: str | Sequence[str] | None = None,
+        **operations: Any,
+    ) -> None:
+        raise NotImplementedError()
+
+    def validate(
+        self,
+        settings: dict,
+        only: str | Sequence | None = None,
+        exclude: str | Sequence | None = None,
+        only_current_env: bool = False,
+        variable_path: tuple | None = None,
+    ) -> None:
+        """Raise ValidationError if invalid"""
+        raise NotImplementedError()
+
+    def _validate_names(
+        self,
+        settings: dict,
+        env: str | None = None,
+        only: str | Sequence | None = None,
+        exclude: str | Sequence | None = None,
+        variable_path: tuple | None = None,
+    ) -> None:
+        raise NotImplementedError()
+
+    def _validate_internal_items(
+        self,
+        value: Any,
+        name: str,
+        validators: list[BaseValidator],
+        variable_path: tuple | None = None,
+    ):
+        """Validate internal items of a data structure."""
+        raise NotImplementedError()
+
+    @property
+    def required(self) -> bool:
+        raise NotImplementedError()
+
+    @required.setter
+    def required(self, value: bool):
+        raise NotImplementedError()
+
+    @property
+    def is_type_of(self):
+        raise NotImplementedError()
+
+    @is_type_of.setter
+    def is_type_of(self, value):
+        raise NotImplementedError()
+
+    def __repr__(self):
+        raise NotImplementedError()
+
+    def __or__(self, other: BaseValidator) -> BaseCombinedValidator:
+        raise NotImplementedError()
+
+    def __and__(self, other: BaseValidator) -> BaseCombinedValidator:
+        raise NotImplementedError()
+
+    def __eq__(self, other: object) -> bool:
+        raise NotImplementedError()
+
+
+class BaseCombinedValidator(BaseValidator):
+    def __init__(
+        self,
+        validator_a: BaseValidator,
+        validator_b: BaseValidator,
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
+        """Takes 2 validators and combines the validation"""
+        raise NotImplementedError()
+
+    def validate(
+        self,
+        settings: Any,
+        only: str | Sequence | None = None,
+        exclude: str | Sequence | None = None,
+        only_current_env: bool = False,
+        variable_path: tuple | None = None,
+    ) -> None:
         raise NotImplementedError()

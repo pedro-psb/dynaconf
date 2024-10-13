@@ -6,21 +6,67 @@ from contextlib import suppress
 from copy import deepcopy
 from itertools import chain
 from types import MappingProxyType
-from typing import Any
-from typing import Callable
-from typing import get_args
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Callable, TypeVar, get_args
 
-from dynaconf import validator_conditions
-from dynaconf.utils import ensure_a_list
-from dynaconf.utils.functional import empty
+from _dynaconf.abstract import BaseSchemaTree, BaseValidator, BaseCombinedValidator
+from _dynaconf.utils import empty
+
+from . import validate_registry
+from .validate_registry import ValidateRegistry
+
+
+def validate(
+    data: dict,
+    schema_tree: BaseSchemaTree,
+    validation_registry: ValidateRegistry = ValidateRegistry(),
+) -> list[ValidationError]:
+    """Validates @data using validators in @schema_tree.
+
+    Params:
+        data: The data to be validated.
+        schema_tree: The SchemaTree instance containing validation info.
+
+    Returns a list of all the ValidationErros found.
+    """
+    raise NotImplementedError()
+
+
+T = TypeVar("T")
+
+
+def ensure_a_list(data: T | list[T]) -> list[T]:
+    """Ensure data is a list or wrap it in a list"""
+
+    def trimmed_split(s, seps=(";", ",")) -> list[str]:
+        """Given a string s, split is by one of one of the seps.
+
+        Example:
+            "settings.toml,settings.yml" -> ["settings.toml", "settings.yml"]
+        """
+        for sep in seps:
+            if sep not in s:
+                continue
+            data = [item.strip() for item in s.strip().split(sep)]
+            return data
+        return [s]  # raw un-split
+
+    if not data:
+        return []
+    if isinstance(data, (list, tuple, set)):
+        return list(data)
+    if isinstance(data, str):
+        data = trimmed_split(data)  # type: ignore
+        return data  # type: ignore
+    return [data]
+
 
 if TYPE_CHECKING:
     from dynaconf.base import LazySettings  # noqa: F401
     from dynaconf.base import Settings
 
 
-DEFAULT_CAST = lambda value: value  # noqa
+def DEFAULT_CAST(value):
+    return value  # noqa
 
 
 EQUALITY_ATTRS = (
@@ -43,9 +89,9 @@ class ValidationError(Exception):
         self.message = message
 
 
-class Validator:
+class Validator(BaseValidator):
     """Validators are conditions attached to settings variables names
-    or patterns::
+    or patterns:
 
         Validator('MESSAGE', must_exist=True, eq='Hello World')
 
@@ -214,10 +260,10 @@ class Validator:
     def is_type_of(self, value):
         self.operations["is_type_of"] = value
 
-    def __or__(self, other: Validator) -> CombinedValidator:
+    def __or__(self, other: BaseValidator) -> BaseCombinedValidator:
         return OrValidator(self, other, description=self.description)
 
-    def __and__(self, other: Validator) -> CombinedValidator:
+    def __and__(self, other: BaseValidator) -> BaseCombinedValidator:
         return AndValidator(self, other, description=self.description)
 
     def __eq__(self, other: object) -> bool:
@@ -354,7 +400,7 @@ class Validator:
             if getattr(settings, "_store", None):
                 try:
                     # settings is a Dynaconf instance
-                    value = getattr(settings, "setdefault")(  #  cheat mypy
+                    value = getattr(settings, "setdefault")(  # cheat mypy
                         name,
                         default_value,
                         apply_default_on_none=self.apply_default_on_none,
@@ -396,7 +442,7 @@ class Validator:
                 key=lambda item: item[0] != "is_type_of",
             )
             for op_name, op_value in sorted_operations:
-                op_function = getattr(validator_conditions, op_name)
+                op_function = getattr(validate_registry, op_name)
                 op_succeeded = False
 
                 # 'is_type_of' special error handling - related to #879
@@ -505,7 +551,7 @@ class Validator:
                 )
 
 
-class CombinedValidator(Validator):
+class CombinedValidator(Validator, BaseCombinedValidator):
     def __init__(
         self,
         validator_a: Validator,

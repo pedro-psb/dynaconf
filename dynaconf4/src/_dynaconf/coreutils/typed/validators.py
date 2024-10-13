@@ -4,9 +4,9 @@ from collections.abc import Sequence
 from typing import Any
 from typing import Callable
 
-from dynaconf.utils.functional import Empty
-from dynaconf.utils.functional import empty
-from dynaconf.validator import Validator as BaseValidator
+from _dynaconf.utils import Empty
+from _dynaconf.utils import empty
+from _dynaconf.coreutils.validate import Validator as BaseValidator
 
 from .exceptions import ValidationError
 

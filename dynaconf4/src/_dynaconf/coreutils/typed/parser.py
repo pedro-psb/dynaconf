@@ -8,12 +8,12 @@ from typing import Any
 from typing import Callable
 from typing import get_origin
 
-from dynaconf.typed import exceptions as ex
-from dynaconf.typed import guards as gu
-from dynaconf.typed import type_definitions as ty
-from dynaconf.typed import utils as ut
-from dynaconf.utils.functional import empty
-from dynaconf.validator import Validator as BaseValidator
+from . import exceptions as ex
+from . import guards as gu
+from . import type_definitions as ty
+from . import utils as ut
+from _dynaconf.utils import empty
+from _dynaconf.abstract import BaseValidator
 
 from .compat import get_annotations
 from .compat import Self
@@ -98,7 +98,7 @@ class ParsedSchema:
         return data
 
 
-def parse_schema(cls) -> ParsedSchema:
+def parse_schema(cls, Validator: type[BaseValidator]) -> ParsedSchema:
     """Extracts defaults and validators from a cls.
 
     This function is used on the main typed.Dynaconf and typed.DataDict
@@ -126,14 +126,14 @@ def parse_schema(cls) -> ParsedSchema:
         gu.raise_for_unsupported_type(name, target_type, type_args, annotation)
 
         marked_not_required = False
-        validator = BaseValidator(name, is_type_of=annotation)
+        validator = Validator(name, is_type_of=annotation)
         spec = schema[name] = Spec(annotation=annotation)
 
         annotated_validators: list[BaseValidator] = []
         extra_validators: list[BaseValidator] = []
 
         if ut.is_annotated(annotation):
-            validator = BaseValidator(name, is_type_of=target_type)
+            validator = Validator(name, is_type_of=target_type)
             spec.annotation = target_type
 
             # here is where we extract markers and validator from Annotated
@@ -213,10 +213,10 @@ def parse_schema(cls) -> ParsedSchema:
 
             # NOTE: combine ORValidator here in case of
             # Union[DataDict, DataDict, ...]
-            extra_validator = BaseValidator(
+            extra_validator = Validator(
                 name,
                 items_validators=instance.__schema__.validators,
-                when=BaseValidator(name, is_type_of=dict),
+                when=Validator(name, is_type_of=dict),
             )
             extra_validators.append(extra_validator)
 

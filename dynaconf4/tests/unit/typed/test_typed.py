@@ -4,7 +4,7 @@ from typing import Annotated, Optional, Union
 
 import pytest
 
-from dynaconf.typed import (
+from _dynaconf.coreutils.typed import (
     DataDict,
     Dynaconf,
     DynaconfSchemaError,

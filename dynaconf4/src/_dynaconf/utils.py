@@ -1,9 +1,18 @@
 from __future__ import annotations
 import rich.pretty
 import rich.panel
-import functools
 
 # _print = rich.print
+
+
+class Empty:
+    __slots__ = ()
+
+    def __repr__(self):
+        return "EMPTY"
+
+
+empty = Empty()
 
 
 def print_kwargs(**kwargs):

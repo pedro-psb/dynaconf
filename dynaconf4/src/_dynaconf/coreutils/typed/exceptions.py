@@ -1,4 +1,4 @@
-from dynaconf.validator import ValidationError
+from _dynaconf.coreutils.validate import ValidationError
 
 
 class DynaconfSchemaError(Exception): ...

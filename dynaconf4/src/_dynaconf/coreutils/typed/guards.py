@@ -1,6 +1,6 @@
-from dynaconf.utils.functional import empty
-from dynaconf.validator import Validator as BaseValidator
-from dynaconf.validator_conditions import is_type_of
+from _dynaconf.utils import empty
+from _dynaconf.abstract import BaseValidator
+from _dynaconf.coreutils.validate_registry import is_type_of
 
 from . import exceptions as ex
 from . import type_definitions as ty

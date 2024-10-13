@@ -2,11 +2,9 @@ from __future__ import annotations
 
 from typing import Optional
 
-from .core import DynaconfCore
-from .data_structs import SchemaTree
-from .dynaconf_options import Options
-from .typed.type_definitions import DataDict
-from .data_structs import DataDict as NewDataDict
+from _dynaconf.control import DynaconfCore
+from _dynaconf.datastructures import SchemaTree, DataDict
+from _dynaconf.config import Options
 
 SchemaType = type[DataDict]  # actually a subclass of that
 

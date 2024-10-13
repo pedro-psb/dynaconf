@@ -7,10 +7,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 
-from dynaconf.typed import guards as gu
-from dynaconf.typed import utils as ut
-from dynaconf.utils.functional import Empty
+from _dynaconf.utils import Empty
 
+from . import guards as gu
+from . import utils as ut
 from .parser import parse_schema
 
 

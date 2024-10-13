@@ -2,10 +2,10 @@ from typing import Annotated
 from typing import Optional
 from typing import Union
 
-from dynaconf.typed.type_definitions import DataDict
-from dynaconf.typed.type_definitions import NotRequired
-from dynaconf.typed.utils import dump_debug_info
-from dynaconf.typed.validators import Contains
+from _dynaconf.coreutils.typed.type_definitions import DataDict
+from _dynaconf.coreutils.typed.type_definitions import NotRequired
+from _dynaconf.coreutils.typed.utils import dump_debug_info
+from _dynaconf.coreutils.typed.validators import Contains
 
 
 def test_extract():

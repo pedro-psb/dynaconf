@@ -1,6 +1,6 @@
 import pytest
 
-from dynaconf.user_api import CompatDynaconf as Dynaconf
+from _dynaconf.user.user_api import CompatDynaconf as Dynaconf
 import os
 
 

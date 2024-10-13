@@ -7,7 +7,7 @@ from typing import get_args
 from typing import get_origin
 from typing import Union
 
-from dynaconf.utils.functional import empty
+from _dynaconf.utils import empty
 
 from .compat import UnionType
 

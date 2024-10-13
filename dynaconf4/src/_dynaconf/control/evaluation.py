@@ -2,9 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Optional, Callable
 
-from .data_structs import SchemaTree
+from _dynaconf.datastructures import SchemaTree
 from _dynaconf.abstract import BaseMergeTree
-from .builtin.evaluators import DefaultEvaluator
 from dataclasses import dataclass
 
 if TYPE_CHECKING:

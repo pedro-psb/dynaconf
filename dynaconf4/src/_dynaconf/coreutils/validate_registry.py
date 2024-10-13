@@ -5,6 +5,10 @@ Implement basic assertions to be used in assertion action
 
 from __future__ import annotations
 
+
+class ValidateRegistry: ...
+
+
 import re
 from typing import get_args
 from typing import get_origin

@@ -1,5 +1,5 @@
-from .apply_mtree import apply_merge_tree
-from .create_mtree import create_merge_tree
+from .apply_merge_tree import apply_merge_tree
+from .create_merge_tree import create_merge_tree
 from .tokenize import tokenize
 from .load import load
 from .token_registry import TokenRegistry

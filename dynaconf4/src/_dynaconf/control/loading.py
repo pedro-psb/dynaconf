@@ -3,9 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Optional
 
-from .builtin.loaders import DirectLoader, EnvironLoader, SqliteLoader, TomlLoader
-from .data_structs import EnvName
+from _dynaconf.datastructures import EnvName
 from _dynaconf.datastructures import LoadRequest
+from _dynaconf.coreutils import LoaderRegistry
 
 from .hookspec import ResourceLoader
 
@@ -36,13 +36,7 @@ class LoadingManager:
         self.options = options or LoadingOptions()
 
         # plugins
-        self.loader_registry: dict[str, ResourceLoader] = {
-            "builtin.loaders.direct": DirectLoader(),
-            "builtin.loaders.toml": TomlLoader(),
-            "builtin.loaders.environ": EnvironLoader(),
-            "builtin.loaders.sqlite": SqliteLoader(),
-        }
-
+        self.loader_registry: LoaderRegistry = LoaderRegistry()
         # state
         self.loaded_data_cache: dict[LoadRequest, dict[EnvName, dict]]
         """The cache of raw data that was effectively loaded for each env."""
@@ -67,7 +61,7 @@ class LoadingManager:
         Returns:
             An env-data map in the format: {env_name<str>: data<dict>}
         """
-        loader = self.loader_registry[load_request.loader_id]
+        loader = self.loader_registry.get_loader(load_request.loader_id)
         has_explicit_envs = load_request.has_explicit_envs or loader.has_explicit_envs
         allowed_envs = load_request.allowed_env_list
         used_envs = []

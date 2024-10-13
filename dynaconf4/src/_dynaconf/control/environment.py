@@ -2,7 +2,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional, TYPE_CHECKING
 
-from .data_structs import BaseOptions, DataDict, EnvName
+from _dynaconf.datastructures import DataDict, EnvName
+from _dynaconf.abstract import BaseOptions
 
 if TYPE_CHECKING:
     from .dynaconf_options import SharedOptions

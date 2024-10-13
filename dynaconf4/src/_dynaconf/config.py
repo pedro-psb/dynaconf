@@ -1,24 +1,30 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional
 
-from .data_structs import BaseOptions
-from .environment import EnvOptions
-from .loading import LoadingOptions
-from .merging import MergingOptions
-from .validation import ValidationOptions
+from _dynaconf.control.environment import EnvOptions
+from _dynaconf.control.loading import LoadingOptions
+from _dynaconf.control.merging import MergingOptions
+from _dynaconf.control.validation import ValidationOptions
+from _dynaconf.abstract import BaseOptions
+import rich
 
 
 @dataclass
-class StartupOptions(BaseOptions):
+class Options(BaseOptions):
+    def print(self):
+        rich.print(self)
+
+
+@dataclass
+class StartupOptions(Options):
     """Settings that customize the behavior of the dynaconf initialization."""
 
     immediate_validation: bool = False
 
 
 @dataclass
-class SharedOptions(BaseOptions):
+class SharedOptions(Options):
     """Settings that should be available in every module scope."""
 
     instance_name: str = "dynaconf"
@@ -26,7 +32,7 @@ class SharedOptions(BaseOptions):
 
 
 @dataclass
-class InternalOptions(BaseOptions):
+class InternalOptions(Options):
     # General options
     shared: SharedOptions = field(default_factory=SharedOptions)
     startup: StartupOptions = field(default_factory=StartupOptions)
@@ -39,27 +45,3 @@ class InternalOptions(BaseOptions):
 
     def print(self):
         rich.print(self)
-
-
-Options = InternalOptions  # alias
-
-# Rudimentary "pre-sets"
-
-
-def default_options() -> Options:
-    return Options()
-
-
-def strict_options(env_list: Optional[list[str]] = None) -> Options:
-    strict_env_list = env_list or ["dev", "ci", "stage" "prod"]
-    options = Options()
-    options.validation.allow_non_schema_settings = False
-    options.env.strict_env_list = strict_env_list
-    return options
-
-
-if __name__ == "__main__":
-    import rich
-
-    options = default_options()
-    options.print()

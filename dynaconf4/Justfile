@@ -1,0 +1,21 @@
+# https://just.systems/man/en/quick-start.html
+alias tc := coreutils-check
+
+# List commands
+default:
+  @just --list --no-aliases
+
+# Display overview of coretuils
+[group('test')]
+test-check NAME:
+    -pytest -v --no-summary --no-header -k {{NAME}}
+
+
+# Display overview of coretuils
+[group('test')]
+coreutils-check: (test-check 'coreutils')
+
+
+[group('static-check')]
+format:
+    black .
