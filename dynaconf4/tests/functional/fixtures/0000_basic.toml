@@ -1,0 +1,55 @@
+[meta]
+
+scenario_name = "Some scenario title"
+dynaconf_version = "x.y.z"
+python_version = "3.9"
+os = "linux"
+
+  [[runner]]
+
+name = "basic"
+description = "description"
+workdir = ""
+run = "python main.py"
+expected = '''
+foo = bar    
+'''
+
+[data]
+
+structure = '''
+main.py
+settings/__init__.py
+settings/settings.toml
+settings/settings.yaml
+'''
+
+environ = '''
+DYNACONF_FOO=bar    
+'''
+
+  [[data.files]]
+
+path = 'main.py'
+content = '''
+from dynaconf import Dynaconf
+
+settings = Dynaconf(
+  settings_files = ["settings/*"]
+)
+print(settings.foo)
+'''
+
+  [[data.files]]
+
+path = 'settings/settings.toml'
+content = '''
+settings/settings.toml-check
+'''
+
+  [[data.files]]
+
+path = 'settings/settings.yaml'
+content = '''
+settings/settings.yaml-check
+'''

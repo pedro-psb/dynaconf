@@ -16,6 +16,11 @@ test-check NAME:
 coreutils-check: (test-check 'coreutils')
 
 
+# Display overview of coretuils
+[group('test')]
+regenerate-functional:
+    python -m tests._tools.regenerate_functional
+
 [group('static-check')]
 format:
     black .

@@ -72,7 +72,7 @@ def build_testtree(testtree_file: Path, target_dir: Path):
         basedir = target_dir / basedir
         if basedir:
             basedir.mkdir(parents=True, exist_ok=True)
-        file_full_path = target_dir / basedir / filename
+        file_full_path = basedir / filename
         file_full_path.touch()
 
         files = [f for f in parsed["data"]["files"] if f]
