@@ -230,3 +230,67 @@ class MergeTree2(BaseMergeTree):
             return _get(p[:-1])[p[-1]]
 
         return _get(path)
+
+
+class MergePolicyFactorWeightMap(NamedTuple):
+    """The weights that will be used to determine what Rule win over the other.
+
+    It may be hard for a human to determine the right weights for a desired behavior, due
+    to the combinatorial possibilites of all conflicts. But it shouldn't be hard to
+    use an algorithm to set the values while respecting some high-level behavior constraints,
+    so that's the recommended approach for finding those values.
+
+    Has the form: {factor}: tuple({weight-for-false}, {weight-for-true})
+    """
+
+    container_scoped: tuple[int, int] = (0, 0)
+    propagates: tuple[int, int] = (0, 0)
+    from_schema: tuple[int, int] = (0, 0)
+
+
+class MergePolicyFactorComb(NamedTuple):
+    """The MergePolicy factors combination that influences a Rule priority resolution.
+
+    Params:
+        container_scoped: If a Rule is scoped at the container level or at the item-level.
+        propagates: If a Rule should propagate or not (a one-off).
+        from_schema: If a Rule was defined in the schema (statically) or dynamically.
+            Example, in a settings file with dynaconf tokens.
+    """
+
+    container_scoped: bool
+    propagates: bool
+    from_schema: bool
+
+    def calculate_weight(self, factor_weight_map: MergePolicyFactorWeightMap) -> int:
+        """The weight of this instance combinaction of factors.
+        TODO: the weight can be cached for each instance.
+        """
+        # Index is 0 for False and 1 for True, because int(False) == 0, int(True) == 1
+        container_scoped_w = factor_weight_map.container_scoped[
+            int(self.container_scoped)
+        ]
+        propagates_w = factor_weight_map.propagates[int(self.propagates)]
+        from_schema_w = factor_weight_map.from_schema[int(self.from_schema)]
+        return container_scoped_w + propagates_w + from_schema_w
+
+
+class MergePolicyRule:
+    FACTOR_WEIGHT_MAP = MergePolicyFactorWeightMap()
+
+    def __init__(
+        self,
+        policy_factor_comb: MergePolicyFactorComb,
+        dict_operation: BaseOperation,
+        list_operation: BaseOperation,
+    ):
+        self.policy_factor_comb = policy_factor_comb
+        self.dict_operation = dict_operation
+        self.list_operation = list_operation
+
+    def __gt__(self, o: MergePolicyRule):
+        """Determines if this Rule has higher priority than the other Rule."""
+        weight_map = MergePolicyRule.FACTOR_WEIGHT_MAP
+        return self.policy_factor_comb.calculate_weight(
+            weight_map
+        ) > o.policy_factor_comb.calculate_weight(weight_map)

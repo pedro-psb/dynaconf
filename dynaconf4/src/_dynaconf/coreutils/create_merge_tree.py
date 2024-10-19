@@ -1,14 +1,107 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
 from typing import Any
 
-from _dynaconf.datastructures import (
-    DynaconfToken,
-    TreePath,
-    ensure_rooted,
-    MergeTree,
-)
-from _dynaconf.abstract import BaseOperation, BaseMergeTree
+from _dynaconf.abstract import BaseMergeTree, BaseOperation
+from _dynaconf.datastructures import DynaconfToken, MergeTree, TreePath, ensure_rooted
+
 from .token_registry import Replace, TokenRegistry
 from .tokenize import tokenize
+
+
+def configure_merge_policy():
+    policy_priority_definition = [
+        MergePolicyFactorComb(
+            container_scoped=True,
+            propagates=True,
+            from_schema=True,
+        )
+    ]
+    factor_weight_map = create_policy_factor_weight_map(policy_priority_definition)
+    MergePolicyRule.FACTOR_WEIGHT_MAP = factor_weight_map
+
+
+def create_policy_factor_weight_map(
+    policy_priority_definition: list[MergePolicyFactorComb],
+) -> MergePolicyFactorWeightMap:
+    """Calculates and creates the policy weights respecting the MergePolicyFactors order.
+
+    Params:
+        policy_priority_definition: A list with the Factor combinations from high to low priority.
+            This is the constraint definition on how the policy should behave (who wins).
+    """
+    return MergePolicyFactorWeightMap(
+        container_scoped=(10, 10),
+        propagates=(4, 4),
+        from_schema=(1, 1),
+    )
+
+
+@dataclass
+class MergePolicyFactorWeightMap:
+    """The weights that will be used to determine what Rule win over the other.
+
+    It may be hard for a human to determine the right weights for a desired behavior, due
+    to the combinatorial possibilites of all conflicts. But it shouldn't be hard to
+    use an algorithm to set the values while respecting some high-level behavior constraints,
+    so that's the recommended approach for finding those values.
+
+    Has the form: {factor}: tuple({weight-for-false}, {weight-for-true})
+    """
+
+    container_scoped: tuple[int, int] = (0, 0)
+    propagates: tuple[int, int] = (0, 0)
+    from_schema: tuple[int, int] = (0, 0)
+
+
+@dataclass
+class MergePolicyFactorComb:
+    """The MergePolicy factors combination that influences a Rule priority resolution.
+
+    Params:
+        container_scoped: If a Rule is scoped at the container level or at the item-level.
+        propagates: If a Rule should propagate or not (a one-off).
+        from_schema: If a Rule was defined in the schema (statically) or dynamically.
+            Example, in a settings file with dynaconf tokens.
+    """
+
+    container_scoped: bool
+    propagates: bool
+    from_schema: bool
+
+    def calculate_weight(self, factor_weight_map: MergePolicyFactorWeightMap) -> int:
+        """The weight of this instance combinaction of factors.
+        TODO: the weight can be cached for each instance.
+        """
+        # Index is 0 for False and 1 for True, because int(False) == 0, int(True) == 1
+        container_scoped_w = factor_weight_map.container_scoped[
+            int(self.container_scoped)
+        ]
+        propagates_w = factor_weight_map.propagates[int(self.propagates)]
+        from_schema_w = factor_weight_map.from_schema[int(self.from_schema)]
+        return container_scoped_w + propagates_w + from_schema_w
+
+
+class MergePolicyRule:
+    FACTOR_WEIGHT_MAP = MergePolicyFactorWeightMap()
+
+    def __init__(
+        self,
+        policy_factor_comb: MergePolicyFactorComb,
+        dict_operation: BaseOperation,
+        list_operation: BaseOperation,
+    ):
+        self.policy_factor_comb = policy_factor_comb
+        self.dict_operation = dict_operation
+        self.list_operation = list_operation
+
+    def __gt__(self, o: MergePolicyRule):
+        """Determines if this Rule has higher priority than the other Rule."""
+        weight_map = MergePolicyRule.FACTOR_WEIGHT_MAP
+        return self.policy_factor_comb.calculate_weight(
+            weight_map
+        ) > o.policy_factor_comb.calculate_weight(weight_map)
 
 
 def create_merge_tree(
@@ -90,7 +183,8 @@ def evaluate(
         if isinstance(next_token.fn, type) and issubclass(next_token.fn, BaseOperation):
             if next_token.next:
                 raise ValueError(
-                    f"BaseOperation should be the left-most token: {next_token.fn!r}"
+                    f"BaseOperation should be the left-most token: {
+                        next_token.fn!r}"
                 )
             merge_operation = next_token.fn
             break
