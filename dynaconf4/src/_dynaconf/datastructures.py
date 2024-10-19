@@ -274,6 +274,23 @@ class MergePolicyFactorComb(NamedTuple):
         from_schema_w = factor_weight_map.from_schema[int(self.from_schema)]
         return container_scoped_w + propagates_w + from_schema_w
 
+    @classmethod
+    def from_binary_mask(cls, expression: str) -> MergePolicyFactorComb:
+        """Uses binary mask expression to create combination.
+
+        Examples:
+            "111" -> container_scope=True, propagates=True, from_schema=True
+            "000" -> container_scope=False, propagates=False, from_schema=False
+            "110" -> container_scope=True, propagates=True, from_schema=False
+        """
+        if len(expression) != 3:
+            raise ValueError("Expression must have length == 3.")
+        return MergePolicyFactorComb(
+            container_scoped="1" in expression[0],
+            propagates="1" in expression[1],
+            from_schema="1" in expression[2],
+        )
+
 
 class MergePolicyRule:
     FACTOR_WEIGHT_MAP = MergePolicyFactorWeightMap()
