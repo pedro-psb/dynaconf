@@ -12,11 +12,14 @@ def main():
         shutil.rmtree(testree_dir)
 
     # re-generate fixtures
-    testtree_files = [f for f in functional_fixture_dir.iterdir() if f.suffix == ".toml"]
+    testtree_files = [
+        f for f in functional_fixture_dir.iterdir() if f.suffix == ".toml"
+    ]
     for testtree_file in testtree_files:
         fixture_dir = Path(functional_fixture_dir / testtree_file.stem)
         fixture_dir.mkdir()
         build_testtree(testtree_file, fixture_dir)
+
 
 if __name__ == "__main__":
     exit(main())

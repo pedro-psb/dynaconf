@@ -58,7 +58,7 @@ def test_happy_sample(tmp_path):
 
     files = ("main.py", "settings/settings.toml", "settings/settings.yaml")
     for file_path in files:
-        file  = Path(tmp_path / file_path)
+        file = Path(tmp_path / file_path)
         assert file.exists()
         assert f"{str(file_path)}-check" == file.read_text()
 

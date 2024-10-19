@@ -2,6 +2,7 @@ from pathlib import Path
 
 import tomllib
 
+
 def build_testtree(testtree_file: Path, target_dir: Path):
     """Create a test fs structure from @testtree_file on @target dir.
 
@@ -47,7 +48,7 @@ def build_testtree(testtree_file: Path, target_dir: Path):
 
     # Open and parse doctree file
     if testtree_file.suffix in (".toml",):
-        parsed= tomllib.loads(testtree_file.read_text())
+        parsed = tomllib.loads(testtree_file.read_text())
     else:
         raise NotImplementedError(f"File type not supported: {testtree_file.name}")
 
@@ -62,10 +63,14 @@ def build_testtree(testtree_file: Path, target_dir: Path):
         paths_in_files = [file["path"] for file in parsed["data"]["files"]]
         for path in paths_in_files:
             if path not in structure.split("\n"):
-                raise ValueError("Files defined in data.structure should have a record in data.files")
+                raise ValueError(
+                    "Files defined in data.structure should have a record in data.files"
+                )
     except KeyError:
-        raise ValueError("Files defined in data.structure should have a record in data.files")
-        
+        raise ValueError(
+            "Files defined in data.structure should have a record in data.files"
+        )
+
     # create structure and populate files
     for path in [s.strip("\n") for s in structure.split("\n")]:
         basedir, _, filename = path.strip("/").rpartition("/")
@@ -76,6 +81,7 @@ def build_testtree(testtree_file: Path, target_dir: Path):
         file_full_path.touch()
 
         files = [f for f in parsed["data"]["files"] if f]
-        if content := [f["content"].strip("\n") for f in files if f["path"] == path.strip("\n")]:
+        if content := [
+            f["content"].strip("\n") for f in files if f["path"] == path.strip("\n")
+        ]:
             Path(file_full_path).write_text(content[0])
-
