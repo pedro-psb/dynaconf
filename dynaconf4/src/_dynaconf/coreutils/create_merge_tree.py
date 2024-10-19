@@ -36,33 +36,36 @@ def create_merge_tree(
 
     def traverse_container(
         container_path: TreePath,
-        key: str | int,
-        value: Any,
+        container: dict | list,
     ):
-        # Recursive case: value is container
-        if isinstance(value, dict | list):
-            for k, v in items(value):
-                traverse_container(container_path + key, k, v)
-            return
+        for key, value in items(container):
+            # Recursive case
+            if isinstance(value, dict | list):
+                traverse_container(container_path + key, value)
+                continue
 
-        # Base case: value is terminal
-        token_operation = None
-        if token := tokenize(value, token_registry):
-            if token.is_container_level is True or token.is_lazy:
-                mtree.add_meta_token(container_path, token)
-                return
-            token_operation, evaluated = evaluate(token, key)
-            value = evaluated or value
+            # Base case: value is terminal
+            token_operation = None
+            if token := tokenize(value, token_registry):
+                if token.is_container_level is True or token.is_lazy:
+                    mtree.add_meta_token(container_path, token)
+                    return
+                token_operation, evaluated = evaluate(token, key)
+                # return only a value and check if is a MetaValue
+                # update value if it is not
+                value = evaluated or value
 
-        # priority merge resolution
-        container_level_operation = first(mtree.get_meta_token(container_path))
-        merge_operation = (
-            token_operation or container_level_operation or default_terminal_operation
-        )
-        mtree.add(container_path, merge_operation(key, value))
+            # priority merge resolution
+            container_level_operation = first(mtree.get_meta_token(container_path))
+            merge_operation = (
+                token_operation
+                or container_level_operation
+                or default_terminal_operation
+            )
+            mtree.add(container_path, merge_operation(key, value))
 
     data = ensure_rooted(data)
-    traverse_container(TreePath(), "root", data["root"])
+    traverse_container(TreePath(("root",)), data["root"])
     return mtree
 
 
