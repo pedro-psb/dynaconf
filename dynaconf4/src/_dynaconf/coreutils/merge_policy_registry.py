@@ -4,6 +4,24 @@ from _dynaconf.datastructures import (
 )
 
 
+from _dynaconf.abstract import BaseMergePolicyRegistry
+
+
+class MergePolicyRegistry(BaseMergePolicyRegistry):
+    def __init__(self):
+        self._policy_factor_weight_map = MergePolicyFactorWeightMap()
+
+    def get_policy_factor_weight_map(self) -> MergePolicyFactorWeightMap:
+        return self._policy_factor_weight_map
+
+    def update_policy_factor_weight_map(
+        self, policy_priority_definition: list[MergePolicyFactorComb]
+    ):
+        self._policy_factor_weight_map = create_merge_policy_weight_map(
+            policy_priority_definition
+        )
+
+
 def create_merge_policy_weight_map(
     policy_priority_definition: list[MergePolicyFactorComb],
 ) -> MergePolicyFactorWeightMap:

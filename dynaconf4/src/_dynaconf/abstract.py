@@ -3,7 +3,12 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Optional, Callable, Any, Sequence
 
 if TYPE_CHECKING:
-    from _dynaconf.datastructures import DynaconfToken, TreePath
+    from _dynaconf.datastructures import (
+        DynaconfToken,
+        TreePath,
+        MergePolicyFactorWeightMap,
+        MergePolicyFactorComb,
+    )
 
 
 class BaseOptions:
@@ -204,4 +209,14 @@ class BaseCombinedValidator(BaseValidator):
         only_current_env: bool = False,
         variable_path: tuple | None = None,
     ) -> None:
+        raise NotImplementedError()
+
+
+class BaseMergePolicyRegistry:
+    def get_policy_factor_weight_map(self) -> MergePolicyFactorWeightMap:
+        raise NotImplementedError()
+
+    def update_policy_factor_weight_map(
+        self, policy_priority_definition: list[MergePolicyFactorComb]
+    ):
         raise NotImplementedError()
