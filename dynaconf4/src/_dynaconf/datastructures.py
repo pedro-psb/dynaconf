@@ -6,36 +6,20 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from _dynaconf.token_registry import Merge
 
-TokenName = str
-EnvName = str
 T = TypeVar("T")
 
-
-def is_token(value: str) -> bool:
-    if not isinstance(value, str):
-        return False
-    return isinstance(value, str) and value.startswith("@")
+###########
+## Alias ##
+###########
 
 
-def ensure_path(path: TreePath | str) -> TreePath:
-    def cast_int(s):
-        try:
-            return int(s)
-        except ValueError:
-            return s
-
-    if isinstance(path, str):
-        return TreePath([cast_int(val) for val in path.split(".")])
-    return path
+TokenName = str
+EnvName = str
 
 
-def ensure_rooted(_data: dict):
-    if "root" not in _data.keys():
-        return {"root": _data}
-    return _data
-
-
-# dynaconf data objects
+########################
+## Core Dynaconf Data ##
+########################
 
 
 class DataDict(dict):
@@ -59,7 +43,9 @@ class DataDict(dict):
 class DataList(list): ...
 
 
-# loader related
+##########
+## Load ##
+##########
 
 
 class Loader(NamedTuple):
@@ -85,12 +71,19 @@ class LoadRequest(NamedTuple):
     direct_data: Optional[dict] = None
 
 
+############
+## Schema ##
+############
+
+
 class SchemaTree(BaseSchemaTree):
     def get_key_type(self, key):
         return str
 
 
-# linear data structures
+######################
+## Linear Structure ##
+######################
 
 
 class LinearDataStructure(Generic[T]):
@@ -123,7 +116,9 @@ class Queue(LinearDataStructure):
         self._data.insert(0, item)
 
 
-# trees related
+################
+## Tree Utils ##
+################
 
 
 class TreePath(tuple):
@@ -140,6 +135,35 @@ class TreePath(tuple):
 
     def __repr__(self):
         return f"{self.__class__.__name__}{super().__repr__()}"
+
+
+def is_token(value: str) -> bool:
+    if not isinstance(value, str):
+        return False
+    return isinstance(value, str) and value.startswith("@")
+
+
+def ensure_path(path: TreePath | str) -> TreePath:
+    def cast_int(s):
+        try:
+            return int(s)
+        except ValueError:
+            return s
+
+    if isinstance(path, str):
+        return TreePath([cast_int(val) for val in path.split(".")])
+    return path
+
+
+def ensure_rooted(_data: dict):
+    if "root" not in _data.keys():
+        return {"root": _data}
+    return _data
+
+
+############
+## Tokens ##
+############
 
 
 class PartialToken(NamedTuple):
@@ -160,6 +184,11 @@ class TokenCallback(NamedTuple):
     fn: Callable
     is_lazy: bool = False
     is_merge_operation: bool = False
+
+
+##################
+## Merge Patch ##
+#################
 
 
 class MergeTree(BaseMergeTree):
@@ -230,6 +259,11 @@ class MergeTree2(BaseMergeTree):
             return _get(p[:-1])[p[-1]]
 
         return _get(path)
+
+
+##################
+## Merge Policy ##
+##################
 
 
 class MergePolicyRuleAttrWeightMap(NamedTuple):
