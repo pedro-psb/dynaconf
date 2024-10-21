@@ -6,8 +6,8 @@ if TYPE_CHECKING:
     from _dynaconf.datastructures import (
         DynaconfToken,
         TreePath,
-        MergePolicyFactorWeightMap,
-        MergePolicyFactorComb,
+        MergePolicyRuleAttrWeightMap,
+        MergePolicyRuleAttr,
     )
 
 
@@ -213,10 +213,10 @@ class BaseCombinedValidator(BaseValidator):
 
 
 class BaseMergePolicyRegistry:
-    def get_policy_factor_weight_map(self) -> MergePolicyFactorWeightMap:
+    def get_policy_factor_weight_map(self) -> MergePolicyRuleAttrWeightMap:
         raise NotImplementedError()
 
     def update_policy_factor_weight_map(
-        self, policy_priority_definition: list[MergePolicyFactorComb]
+        self, policy_priority_definition: list[MergePolicyRuleAttr]
     ):
         raise NotImplementedError()

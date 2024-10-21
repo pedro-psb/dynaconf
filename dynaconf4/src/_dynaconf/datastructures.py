@@ -232,7 +232,7 @@ class MergeTree2(BaseMergeTree):
         return _get(path)
 
 
-class MergePolicyFactorWeightMap(NamedTuple):
+class MergePolicyRuleAttrWeightMap(NamedTuple):
     """The weights that will be used to determine what Rule win over the other.
 
     It may be hard for a human to determine the right weights for a desired behavior, due
@@ -248,21 +248,25 @@ class MergePolicyFactorWeightMap(NamedTuple):
     from_schema: tuple[int, int] = (0, 0)
 
 
-class MergePolicyFactorComb(NamedTuple):
-    """The MergePolicy factors combination that influences a Rule priority resolution.
+class MergePolicyRuleAttr(NamedTuple):
+    """The MergePolicy Rule attributes that influences a Rule priority resolution.
 
     Params:
         container_scoped: If a Rule is scoped at the container level or at the item-level.
-        propagates: If a Rule should propagate or not (a one-off).
+        propagates: If a Rule should propagate or not (a one-off). For example, a Rule
+            that defines that root level should merge, but that this behavior should
+            not propagate to the rest of the tree.
         from_schema: If a Rule was defined in the schema (statically) or dynamically.
-            Example, in a settings file with dynaconf tokens.
+            For example, in a settings file with dynaconf tokens is dynamic.
     """
 
     container_scoped: bool
     propagates: bool
     from_schema: bool
+    # TODO: add attribute 'inherited' to convey whether the rule came from the previous
+    # node in the data tree.
 
-    def calculate_weight(self, factor_weight_map: MergePolicyFactorWeightMap) -> int:
+    def calculate_weight(self, factor_weight_map: MergePolicyRuleAttrWeightMap) -> int:
         """The weight of this instance combinaction of factors.
         TODO: the weight can be cached for each instance.
         """
@@ -275,7 +279,7 @@ class MergePolicyFactorComb(NamedTuple):
         return container_scoped_w + propagates_w + from_schema_w
 
     @classmethod
-    def from_binary_mask(cls, expression: str) -> MergePolicyFactorComb:
+    def from_binary_mask(cls, expression: str) -> MergePolicyRuleAttr:
         """Uses binary mask expression to create combination.
 
         Examples:
@@ -285,7 +289,7 @@ class MergePolicyFactorComb(NamedTuple):
         """
         if len(expression) != 3:
             raise ValueError("Expression must have length == 3.")
-        return MergePolicyFactorComb(
+        return MergePolicyRuleAttr(
             container_scoped="1" in expression[0],
             propagates="1" in expression[1],
             from_schema="1" in expression[2],
@@ -293,21 +297,33 @@ class MergePolicyFactorComb(NamedTuple):
 
 
 class MergePolicyRule:
-    FACTOR_WEIGHT_MAP = MergePolicyFactorWeightMap()
+    """A Rule that defines which operation should be used in the items of a dict or list.
+
+    Params:
+        rule_attributes: The Rule Attributes that influences this rule weight/score.
+        dict_operation: The operation that should be used in a dict if this Rule wins.
+        list_operation: The operation that should be used in a list if this Rule wins.
+
+    Class Attributes:
+        FACTOR_WEIGHT_MAP: The map between Rule Attributes and weights based on their values. This
+            should be shared by all `MergePolicyRule` instances.
+    """
+
+    FACTOR_WEIGHT_MAP = MergePolicyRuleAttrWeightMap()
 
     def __init__(
         self,
-        policy_factor_comb: MergePolicyFactorComb,
+        rule_attributes: MergePolicyRuleAttr,
         dict_operation: BaseOperation,
         list_operation: BaseOperation,
     ):
-        self.policy_factor_comb = policy_factor_comb
+        self.rule_attributes = rule_attributes
         self.dict_operation = dict_operation
         self.list_operation = list_operation
 
     def __gt__(self, o: MergePolicyRule):
         """Determines if this Rule has higher priority than the other Rule."""
         weight_map = MergePolicyRule.FACTOR_WEIGHT_MAP
-        return self.policy_factor_comb.calculate_weight(
-            weight_map
-        ) > o.policy_factor_comb.calculate_weight(weight_map)
+        self_weight = self.rule_attributes.calculate_weight(weight_map)
+        other_weight = o.rule_attributes.calculate_weight(weight_map)
+        return self_weight > other_weight
