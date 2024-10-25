@@ -32,7 +32,7 @@ class SharedOptions(Options):
 
 
 @dataclass
-class InternalOptions(Options):
+class DynaconfConfig(Options):
     # General options
     shared: SharedOptions = field(default_factory=SharedOptions)
     startup: StartupOptions = field(default_factory=StartupOptions)

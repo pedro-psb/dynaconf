@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import NamedTuple, Sequence, Optional, Callable, TypeVar, Generic
 from _dynaconf.abstract import BaseOperation, BaseMergeTree, BaseSchemaTree
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from _dynaconf.token_registry import Merge
@@ -67,7 +67,8 @@ class LoadRequest(NamedTuple):
     uri: str
     order: int = 0
     has_explicit_envs: Optional[bool] = None
-    allowed_env_list: Optional[list] = None
+    allowed_env_list: Optional[list[str]] = None
+    keys: Optional[list[str]] = None
     direct_data: Optional[dict] = None
 
 
@@ -189,6 +190,27 @@ class TokenCallback(NamedTuple):
 ##################
 ## Merge Patch ##
 #################
+
+
+class PatchOperation(NamedTuple):
+    """
+    This represents a patch operation to be performed onto a container (dict or list).
+
+    Params:
+        operation_id: The identifier of the operation.
+        path: The full path to the node where the patch should be applied.
+        lazy: Whether this is a lazy patch or not.
+    """
+
+    operation_id: str
+    path: TreePath
+    value: Any
+    lazy: bool
+
+    def __str__(self):
+        if self.lazy:
+            return f"{self.operation_id.capitalize()}({self.path}, lazy=True)"
+        return f"{self.operation_id.capitalize()}({self.path})"
 
 
 class MergeTree(BaseMergeTree):
