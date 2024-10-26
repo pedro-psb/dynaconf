@@ -39,35 +39,44 @@ def load_environ(load_request: LoadRequest, load_context: LoadContext):
         except TypeError:
             raise
 
-    def process_key(key: str) -> TreePath:
+    def process_key(string_key: str) -> TreePath:
         keys = []
-        no_prefix = key[len(prefix) :]
-        for k in no_prefix.split("__"):
-            _k = cast_int(k) if schema_tree.get_key_type(k) is int else k.lower()
-            keys.append(_k)
+        # strip PREFIX_ and split on separator
+        raw_keys = string_key[len(prefix) :].split("__")
+        keys.append(raw_keys[0].lower())
+        for i in range(1, len(raw_keys)):
+            cur_key = raw_keys[i]
+            prev_key = raw_keys[i-1]
+            key = cast_int(cur_key) if schema_tree.get_key_type(*raw_keys[:i]) is list else cur_key.lower()
+            keys.append(key)
         return TreePath(keys)
 
     def process_value(value: str) -> Any:
         return value
 
     def treefy_map(data_map: list[tuple[TreePath, Any]]) -> dict[str | int, Any]:
-        def add_to_tree(tree, keys, value):
-            # Recursively build the tree structure
-            for key in keys[:-1]:
-                tree = tree.setdefault(key, {})
-            tree[keys[-1]] = value
+        root = {}
+        def add_to_tree(container, keys, value):
+            if len(keys) < 2:
+                container[keys[0]] = value
+                return
+            cur = keys[0]
+            next = keys[1]
+            next_container = [None] if isinstance(next, int) else {}
+            container[cur] = next_container
+            add_to_tree(next_container, keys[:1], value)
 
-        tree = {}
+        # breakpoint()
         for keys, value in data_map:
-            add_to_tree(tree, keys, value)
-        return tree
+            add_to_tree(root, keys, value)
+        return root
 
-    dynaconf_data_map = [
+    path_value_map = [
         (process_key(k), process_value(v))
         for k, v in os.environ.items()
         if k.lower().startswith(prefix)
     ]
-    return treefy_map(dynaconf_data_map)
+    return treefy_map(path_value_map)
 
 
 def load_toml(load_request: LoadRequest, load_context: LoadContext): ...

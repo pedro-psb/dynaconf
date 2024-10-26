@@ -17,7 +17,7 @@ class BaseOptions:
 
 
 class BaseSchemaTree:
-    def get_key_type(self, key: str | int) -> None | type:
+    def get_key_type(self, *key_path: str | int) -> None | type:
         """Get key type or None if not present."""
         raise NotImplementedError()
 

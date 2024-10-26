@@ -78,7 +78,7 @@ class LoadRequest(NamedTuple):
 
 
 class SchemaTree(BaseSchemaTree):
-    def get_key_type(self, key):
+    def get_key_type(self, *key_path: str | int):
         return str
 
 
