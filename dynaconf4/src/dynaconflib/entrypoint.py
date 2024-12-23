@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from typing import TypeVar, Optional
-from .registry import RegistryManager, Registry
+from .registry import RegistryManager, BaseRegistry
 from .datastructures import MergeResult
 from .core import DynaconfCore
 
@@ -20,7 +20,7 @@ def Dynaconf(schema: type[T], *args, **kwargs) -> T:
 
     # bind data and control
     instance.__dynaconf_core__ = dynaconf_core
-    dynaconf_core.env_data.add("default", instance)
+    dynaconf_core.namespace_data.add("default", instance)
 
     # run loaders
     dynaconf_core.load(loader_id="direct", payload={"data": data})

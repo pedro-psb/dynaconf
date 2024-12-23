@@ -1,14 +1,14 @@
-from typing import Callable
 from functools import partial
+from dynaconflib.datastructures import BaseLoader, BasePatch, TokenCallback, Validator
 
 
-class Registry:
+class BaseRegistry:
     ids = set()
 
     def __init__(self, id: str, instance_cls: type):
-        if id in Registry.ids:
+        if id in BaseRegistry.ids:
             raise KeyError("Id already exists")
-        Registry.ids.add(id)
+        BaseRegistry.ids.add(id)
 
         self.id = id
         self.data = {}
@@ -28,12 +28,18 @@ class Registry:
             raise TypeError(f"Value must be of type {self.instance_cls!r}")
 
 
-def test_regsitry():
+LoaderRegistry = partial(BaseRegistry, instance_cls=BaseLoader)
+TokenCallbackRegistry = partial(BaseRegistry, instance_cls=TokenCallback)
+PatchOpRegistry = partial(BaseRegistry, instance_cls=BasePatch)
+ValidatorRegistry = partial(BaseRegistry, instance_cls=Validator)
+
+
+def test_registry():
     import pytest
 
     # given
-    IntRegistry = partial(Registry, instance_cls=int)
-    BoolRegistry = partial(Registry, instance_cls=bool)
+    IntRegistry = partial(BaseRegistry, instance_cls=int)
+    BoolRegistry = partial(BaseRegistry, instance_cls=bool)
 
     int_reg = IntRegistry("foo")
     bool_reg = BoolRegistry("bar")
