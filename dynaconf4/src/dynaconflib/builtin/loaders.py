@@ -2,6 +2,8 @@ from typing import Any
 import os
 from dynaconflib.datastructures import LoadRequest, LoadContext, TreePath, BaseLoader
 from dynaconflib.registry import LoaderRegistry
+from dynaconflib.utils import Empty, is_last
+from dynaconflib.datastructures import SchemaTree, SchemaNode
 
 
 def setup_loaders(registry: LoaderRegistry):
@@ -19,37 +21,28 @@ class DirectLoader(BaseLoader):
 
 class EnvLoader(BaseLoader):
     def load(self, load_request: LoadRequest, load_context: LoadContext):
-        schema_tree = load_context.schema_tree
+        schema = load_context.schema_tree
         prefix = "dynaconf_"
         strict_lower = True
 
-        path_value_map = [
-            (self.process_key(k, prefix), self.process_value(v))
-            for k, v in os.environ.items()
-            if k.lower().startswith(prefix)
-        ]
-        return self.treefy_map(path_value_map)
+        filtered_envvars = (
+            (k, v) for k, v in os.environ.items() if k.lower().startswith(prefix)
+        )
+        loaded_parts = []
+        for k, v in filtered_envvars:
+            raw_path = self.process_key(k, prefix)
+            value = self.process_value(v)
+            data = self.path_to_data(raw_path, value, schema)
+            loaded_parts.append(data)
+        return loaded_parts
 
     @staticmethod
     def process_key(input: str, prefix: str) -> TreePath:
-        def cast_int(k):
-            try:
-                return int(k)
-            except TypeError:
-                raise
-
         keys = []
-        # strip PREFIX_ and split on separator
         raw_keys = input[len(prefix) :].split("__")
         keys.append(raw_keys[0].lower())
         for i in range(1, len(raw_keys)):
             cur_key = raw_keys[i]
-            prev_key = raw_keys[i - 1]
-            # key = (
-            #     cast_int(cur_key)
-            #     if schema_tree.get_type(*raw_keys[:i]) is list
-            #     else cur_key.lower()
-            # )
             key = cur_key
             keys.append(key)
         return TreePath(keys)
@@ -59,22 +52,44 @@ class EnvLoader(BaseLoader):
         return value
 
     @staticmethod
-    def treefy_map(data_map: list[tuple[TreePath, Any]]) -> dict[str | int, Any]:
-        root = {}
+    def path_to_data(raw_path: list[str], value, schema: SchemaTree) -> dict:
+        """
+        Transform a path in the form (raw_path: value) to its expanded pyhton data.
 
-        def add_to_tree(container, keys, value):
-            if len(keys) < 2:
-                container[keys[0]] = value
-                return
-            cur = keys[0]
-            next = keys[1]
-            next_container = [None] if isinstance(next, int) else {}
-            container[cur] = next_container
-            add_to_tree(next_container, keys[:1], value)
+        Example:
+            path_to_data(["a", "b"]], value) -> {"a": {"b": value}}
+        """
+        schema_path = schema.raw_to_schema_path(raw_path)
+        return EnvLoader.schema_path_to_data(schema_path, value)
 
-        for keys, value in data_map:
-            add_to_tree(root, keys, value)
-        return root
+    @staticmethod
+    def schema_path_to_data(schema_path: list[SchemaNode], value) -> dict:
+        """
+        Transform a path in the form (schema_path: value) to its expanded pyhton data.
+
+        Example:
+            path_to_data([SchemaNode("a", ...), SchemaNode("b", ...)], value) -> {"a": {"b": value}}
+        """
+        terminal_value = value
+        parent_v = {}
+        final_data = parent_v
+
+        for i, current_schema in enumerate(schema_path):
+            current_type = current_schema.value_type
+            current_k = current_schema.key
+            current_v = (
+                current_type() if not is_last(schema_path, i) else terminal_value
+            )
+            # fill parent_v to sufficient length if a list
+            if isinstance(parent_v, list):
+                current_k = current_k.value
+                for i in range(current_k + 1):
+                    parent_v.append(Empty)
+            # add to parent (works for dict and lists)
+            parent_v[current_k] = current_v
+            # update
+            parent_v = current_v
+        return final_data
 
 
 class TomlLoader(BaseLoader):

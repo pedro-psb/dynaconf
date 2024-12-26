@@ -4,7 +4,7 @@ from .patch import BasePatch
 from .token import DynaconfToken, TokenCallback
 from .validate import Validator
 from .tree import TreePath
-from .schema import SchemaTree
+from .schema import SchemaTree, SchemaNode, Index
 
 __all__ = [
     "DataDict",
@@ -18,4 +18,6 @@ __all__ = [
     "Validator",
     "TreePath",
     "SchemaTree",
+    "SchemaNode",
+    "Index",
 ]
