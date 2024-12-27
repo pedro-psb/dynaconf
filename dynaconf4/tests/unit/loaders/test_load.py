@@ -1,4 +1,4 @@
-from dynaconflib.datastructures import LoadRequest, LoadContext, SchemaTree
+from dynaconflib.datastructures import LoadRequest, LoadContext, SchemaTree, Index
 from dynaconflib.builtin import setup_loaders
 from dynaconflib.registry import LoaderRegistry
 from dataclasses import dataclass
@@ -15,6 +15,7 @@ class Scenario:
     expected: dict
     file_data: dict = None
     envvar_data: dict = None
+    schema_items: list[tuple] = None
 
 
 scenarios = [
@@ -25,7 +26,7 @@ scenarios = [
             uri="unit_test",
             direct_data={"foo": "from-load-1"},
         ),
-        expected={"default": {"foo": "from-load-1"}},
+        expected=[{"default": {"foo": "from-load-1"}}],
     ),
     Scenario(
         id="direct:with-root-envs",
@@ -38,7 +39,7 @@ scenarios = [
             },
             namespace_in_root=True,
         ),
-        expected={"default": {"foo": "from-load-2"}, "prod": {"foo": "prod-bar"}},
+        expected=[{"default": {"foo": "from-load-2"}, "prod": {"foo": "prod-bar"}}],
     ),
     Scenario(
         id="envvar:no-nesting",
@@ -47,7 +48,18 @@ scenarios = [
             uri="unit_test",
         ),
         envvar_data={"DYNACONF_MY_KEY": "123"},
-        expected={"default": {"my_key": "123"}},
+        schema_items=[(["my_key"], int)],
+        expected=[{"default": {"my_key": "123"}}],
+    ),
+    Scenario(
+        id="envvar:no-nesting-no-schema",
+        load_request=LoadRequest(
+            loader_id="builtin.environ",
+            uri="unit_test",
+        ),
+        envvar_data={"DYNACONF_MY_KEY": "123"},
+        schema_items=[(["my_key"], int)],
+        expected=[{"default": {"my_key": "123"}}],
     ),
     Scenario(
         id="envvar:dict-nesting",
@@ -56,7 +68,8 @@ scenarios = [
             uri="unit_test",
         ),
         envvar_data={"DYNACONF_MYDICT__MYKEY": "123"},
-        expected={"default": {"mydict": {"mykey": "123"}}},
+        schema_items=[(["mydict"], dict), (["mydict", "mykey"], int)],
+        expected=[{"default": {"mydict": {"mykey": "123"}}}],
     ),
     Scenario(
         id="envvar:dict-nesting2",
@@ -65,7 +78,13 @@ scenarios = [
             uri="unit_test",
         ),
         envvar_data={"DYNACONF_MYDICT__FOO__BAR__MYKEY": "123"},
-        expected={"default": {"mydict": {"foo": {"bar": {"mykey": "123"}}}}},
+        schema_items=[
+            (["mydict"], dict),
+            (["mydict", "foo"], dict),
+            (["mydict", "foo", "bar"], dict),
+            (["mydict", "foo", "bar", "mykey"], int),
+        ],
+        expected=[{"default": {"mydict": {"foo": {"bar": {"mykey": "123"}}}}}],
     ),
     Scenario(
         id="envvar:list-nesting",
@@ -74,7 +93,11 @@ scenarios = [
             uri="unit_test",
         ),
         envvar_data={"DYNACONF_MYLIST__0": "123"},
-        expected={"default": {"mylist": ["@insert 0 123"]}},
+        schema_items=[
+            (["mylist"], list),
+            (["mylist", Index()], int),
+        ],
+        expected=[{"default": {"mylist": ["123"]}}],
         # load_context=LoadContext(schema_tree=mock_schema_tree(path_types=[(("mylist",), list)]))
     ),
 ]
@@ -82,13 +105,20 @@ scenarios = [
 
 @pytest.mark.parametrize("scenario", scenarios)
 def test_load(scenario: Scenario, monkeypatch):
-    load_context = LoadContext(schema_tree=SchemaTree())  # type: ignore
+    # setup schema
+    schema = SchemaTree()
+    schema_items = scenario.schema_items or []
+    for path, t in schema_items:
+        schema.add(path, t)
+    load_context = LoadContext(schema_tree=schema)
+
     with monkeypatch.context() as m:
         # mock environ
-        if scenario.envvar_data:
-            for k, v in scenario.envvar_data.items():
-                m.setenv(k, v)
+        envvar_data = scenario.envvar_data or {}
+        for k, t in envvar_data.items():
+            m.setenv(k, t)
         # test
-        result = scenario.load_request.load(load_registry, load_context)
-        for env, data in scenario.expected.items():
-            assert result[env] == data
+        load_request = scenario.load_request
+        loader = load_registry.get(load_request.loader_id)
+        result = loader.load(load_request, load_context)
+        assert result.data == scenario.expected

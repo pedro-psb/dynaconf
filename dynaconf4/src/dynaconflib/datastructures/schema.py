@@ -27,6 +27,14 @@ class SchemaTree:
         self.root = SchemaNode("root", str, dict, str)
 
     def add(self, key_path, value_type, children_key_type=str):
+        """
+        Add a value_type to a schema node in the given location.
+
+        Params:
+            key_path: The location of the schema node.
+            value_type: The type of this node.
+            children_key_type: The type of the node children, if dict or list.
+        """
         # TODO make sanity checks.
         # E.g:
         # 1. [(A, k=str, v=list), (B, k=str, v=int)] is invalid, because
@@ -46,8 +54,9 @@ class SchemaTree:
     def get(self, key_path) -> SchemaNode:
         return self.type_map[tuple(key_path)]
 
-    def raw_to_schema_path(self, raw_path: list[str]) -> list[SchemaNode]:
+    def create_schema_path(self, raw_path: tuple[str]) -> list[SchemaNode]:
         final = []
+        raw_path = tuple(raw_path)
         parent_node = self.root
         for i in range(len(raw_path)):
             # take each sub patch from start to i
@@ -56,7 +65,7 @@ class SchemaTree:
             # handle case where parent is list
             if parent_node.value_type is list:
                 key = Index(int(key))
-                cur_path = cur_path[:i] + [key]
+                cur_path = cur_path[:i] + (key,)
                 raw_path = cur_path + raw_path[i + 1 :]
             # add to transformed list
             current_node = self.get(tuple(cur_path))._replace(key=key)
@@ -64,6 +73,9 @@ class SchemaTree:
             # update
             parent_node = current_node
         return final
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}({self.type_map!r})"
 
     def __str__(self):
         return str(self.type_map)

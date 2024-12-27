@@ -1,9 +1,9 @@
 from __future__ import annotations
-from typing import NamedTuple, Optional, TYPE_CHECKING
+from typing import NamedTuple, Optional
 from .schema import SchemaTree
-
-if TYPE_CHECKING:
-    from dynaconflib.registry import LoaderRegistry
+from collections import defaultdict
+from dynaconflib.utils import type_guard
+from dynaconflib.exceptions import LoadError
 
 
 class LoadRequest(NamedTuple):
@@ -23,17 +23,6 @@ class LoadRequest(NamedTuple):
     namespace_filter: Optional[list] = None
     direct_data: Optional[dict] = None
 
-    def load(self, registry: LoaderRegistry, context: LoadContext):
-        loader = registry.get(self.loader_id)
-        namespace_in_root = self.namespace_in_root or context.namespace_in_root
-        parsed = loader.load(self, context)
-        result = loader.ensure_namespaces(
-            parsed,
-            namespace_in_root=namespace_in_root,
-            namespace_default=context.namespace_default,
-        )
-        return result
-
 
 class LoadContext(NamedTuple):
     namespace_default: str = "default"
@@ -43,21 +32,69 @@ class LoadContext(NamedTuple):
     schema_strict: bool = True
     schema_tree: SchemaTree = None
     schema_strict: bool = True
+    case_all_lower: bool = True
+
+
+class LoadResult:
+    """
+    The result of a load.
+
+    It hold a list of load-parts [0] and provides access to the data by namespace [1].
+    Most loaders only contain one load-part, but some requires multi-part, like
+    multi-file yaml and the environ loader.
+
+    [0]: load-part = { namespace-0: data, ..., namespace-n: data }
+    [1]: result.get("namespace-0") -> [{ns-data}, ..., {ns-data}]
+    """
+
+    def __init__(
+        self,
+        data_parts: list[dict],
+        load_request: LoadRequest,
+        load_context: LoadContext,
+    ):
+        # init
+        self.load_request = load_request
+        self._data_by_ns = defaultdict(list)
+        self.data = []
+        # ensure namespaces
+        namespace_in_root = (
+            load_request.namespace_in_root or load_context.namespace_in_root
+        )
+        namespace_default = load_context.namespace_default
+        for data_part in data_parts:
+            if namespace_in_root is True:
+                data_part = {env: data for env, data in data_part.items()}
+            else:
+                data_part = {namespace_default: data_part}
+            self.add(data_part)
+
+    def add(self, data_part):
+        self.data.append(data_part)
+        for env, data in data_part.items():
+            try:
+                type_guard(data, dict)
+            except TypeError:
+                raise LoadError(
+                    f"Malformed part-data. Expected {dict}, got {type(data)}.\n{self.load_request=}"
+                )
+            self._data_by_ns[env].append(data)
+
+    def get(self, ns: str) -> list[dict]:
+        return self._data_by_ns[ns]
+
+    def items(self) -> list[tuple[str, dict]]:
+        return self._data_by_ns.items()
+
+    def __repr__(self):
+        return repr(self._data_by_ns)
 
 
 class BaseLoader:
     def __init__(self, id: str):
         self.id = id
 
-    def load(self, load_request: LoadRequest, **kwargs):
+    def load(
+        self, load_request: LoadRequest, load_context: LoadContext, **kwargs
+    ) -> LoadResult:
         raise NotImplementedError()
-
-    @staticmethod
-    def ensure_namespaces(
-        parsed_data: dict,
-        namespace_in_root: bool,
-        namespace_default: str,
-    ):
-        if namespace_in_root is True:
-            return {env: data for env, data in parsed_data.items()}
-        return {namespace_default: parsed_data}

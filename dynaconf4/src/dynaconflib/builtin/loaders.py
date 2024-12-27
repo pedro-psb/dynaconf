@@ -1,9 +1,17 @@
 from typing import Any
 import os
-from dynaconflib.datastructures import LoadRequest, LoadContext, TreePath, BaseLoader
+from dynaconflib.datastructures import (
+    LoadRequest,
+    LoadContext,
+    TreePath,
+    BaseLoader,
+    LoadResult,
+    SchemaTree,
+    SchemaNode,
+)
 from dynaconflib.registry import LoaderRegistry
-from dynaconflib.utils import Empty, is_last
-from dynaconflib.datastructures import SchemaTree, SchemaNode
+from dynaconflib.utils import Empty, is_last, type_guard
+from dynaconflib.exceptions import LoadError
 
 
 def setup_loaders(registry: LoaderRegistry):
@@ -16,50 +24,60 @@ def setup_loaders(registry: LoaderRegistry):
 
 class DirectLoader(BaseLoader):
     def load(self, load_request: LoadRequest, load_context: LoadContext):
-        return load_request.direct_data
+        direct_data = load_request.direct_data
+        if not direct_data:
+            raise ValueError("Direct loader requires data to be passed.")
+        type_guard(load_request.direct_data, dict)
+        return LoadResult([direct_data], load_request, load_context)
 
 
 class EnvLoader(BaseLoader):
     def load(self, load_request: LoadRequest, load_context: LoadContext):
         schema = load_context.schema_tree
         prefix = "dynaconf_"
-        strict_lower = True
+        case_all_lower = load_context.case_all_lower
+        schema_strict = load_context.schema_strict
 
-        filtered_envvars = (
-            (k, v) for k, v in os.environ.items() if k.lower().startswith(prefix)
-        )
+        env_data = os.environ.items()
+        filtered_envvars = ((k, v) for k, v in env_data if k.lower().startswith(prefix))
         loaded_parts = []
         for k, v in filtered_envvars:
             raw_path = self.process_key(k, prefix)
             value = self.process_value(v)
-            data = self.path_to_data(raw_path, value, schema)
+            data = self.path_to_data(raw_path, value, schema, schema_strict)
             loaded_parts.append(data)
-        return loaded_parts
+        return LoadResult(loaded_parts, load_request, load_context)
 
     @staticmethod
     def process_key(input: str, prefix: str) -> TreePath:
-        keys = []
         raw_keys = input[len(prefix) :].split("__")
-        keys.append(raw_keys[0].lower())
-        for i in range(1, len(raw_keys)):
-            cur_key = raw_keys[i]
-            key = cur_key
-            keys.append(key)
+        keys = [EnvLoader.handle_key_case(k) for k in raw_keys]
         return TreePath(keys)
+
+    @staticmethod
+    def handle_key_case(key: str):
+        return key.lower()
 
     @staticmethod
     def process_value(value: str) -> Any:
         return value
 
     @staticmethod
-    def path_to_data(raw_path: list[str], value, schema: SchemaTree) -> dict:
+    def path_to_data(
+        raw_path: list[str], value, schema: SchemaTree, schema_strict=True
+    ) -> dict:
         """
         Transform a path in the form (raw_path: value) to its expanded pyhton data.
 
         Example:
             path_to_data(["a", "b"]], value) -> {"a": {"b": value}}
         """
-        schema_path = schema.raw_to_schema_path(raw_path)
+        try:
+            schema_path = schema.create_schema_path(raw_path)
+        except KeyError as e:
+            if schema_strict:
+                raise LoadError(f"Key not found in schema. {e}.\n{schema=}")
+            schema_path = schema.create_dummy_schema_path(raw_path)
         return EnvLoader.schema_path_to_data(schema_path, value)
 
     @staticmethod

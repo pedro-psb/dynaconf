@@ -17,7 +17,7 @@ def test_schema_get_path():
         SchemaNode("b", str, dict, str),
         SchemaNode("0", str, int, None),
     ]
-    result = schema.raw_to_schema_path(path)
+    result = schema.create_schema_path(path)
     assert result == expected
     assert result[1].key.value == expected[1].key.value
 
