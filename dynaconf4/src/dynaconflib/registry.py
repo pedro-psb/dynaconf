@@ -1,5 +1,11 @@
 from functools import partial
-from dynaconflib.datastructures import BaseLoader, BasePatch, TokenCallback, Validator
+from dynaconflib.datastructures import (
+    BaseLoader,
+    TokenCallback,
+    Validator,
+    BasePatchOperation,
+)
+from dataclasses import dataclass
 
 
 class BaseRegistry:
@@ -30,8 +36,28 @@ class BaseRegistry:
 
 LoaderRegistry = partial(BaseRegistry, instance_cls=BaseLoader)
 TokenCallbackRegistry = partial(BaseRegistry, instance_cls=TokenCallback)
-PatchOpRegistry = partial(BaseRegistry, instance_cls=BasePatch)
+PatchOpRegistry = partial(BaseRegistry, instance_cls=BasePatchOperation)
 ValidatorRegistry = partial(BaseRegistry, instance_cls=Validator)
+
+
+@dataclass
+class RegistrySet:
+    token_callbacks = TokenCallbackRegistry("token_callbacks")
+    patch_operations = PatchOpRegistry("merge_operations")
+    validators = ValidatorRegistry("validators")
+    loaders = LoaderRegistry("loaders")
+
+    def setup_builtin(self):
+        from dynaconflib.builtin import (
+            setup_loaders,
+            setup_patch_operations,
+            setup_tokens,
+        )
+
+        setup_loaders(self.loaders)
+        setup_patch_operations(self.patch_operations)
+        setup_tokens(self.token_callbacks)
+        return self
 
 
 def test_registry():

@@ -13,6 +13,8 @@ class LoadRequest(NamedTuple):
         uri: An unique identifier for the data source.
         order: The order that the request will be loaded.
         namespace_in_root: Whether the data source has namespaces in root.
+        namespace_filter: Ignore namespaces not in the filter list.
+        direct_data: Used for direct data loading.
 
     """
 

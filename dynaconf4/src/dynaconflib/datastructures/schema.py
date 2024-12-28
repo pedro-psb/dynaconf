@@ -1,4 +1,5 @@
 from typing import NamedTuple
+from dynaconflib.utils import is_last
 
 
 class SchemaNode(NamedTuple):
@@ -26,7 +27,7 @@ class SchemaTree:
         self.type_map = {}
         self.root = SchemaNode("root", str, dict, str)
 
-    def add(self, key_path, value_type, children_key_type=str):
+    def add(self, key_path, value_type, children_key_type=str, default=None):
         """
         Add a value_type to a schema node in the given location.
 
@@ -74,8 +75,32 @@ class SchemaTree:
             parent_node = current_node
         return final
 
+    def create_default_schema_path(self, raw_path: tuple[str]) -> list[SchemaNode]:
+        final: list[SchemaNode] = []
+        raw_path = tuple(raw_path)
+        parent_node = self.root
+        for i, node in enumerate(raw_path):
+            is_list_item = is_digit(node)
+            if is_list_item:
+                if i == 0:
+                    raise ValueError("First item's key can't be an integer")
+                final[-1] = final[-1]._replace(
+                    key_type=str, value_type=list, children_key_type=int
+                )
+                new_node = SchemaNode(int(node), int, dict, children_key_type=str)
+            else:
+                new_node = SchemaNode(node, str, dict, children_key_type=str)
+            final.append(new_node)
+        return final
+
     def __repr__(self):
         return f"{self.__class__.__name__}({self.type_map!r})"
 
     def __str__(self):
         return str(self.type_map)
+
+
+def is_digit(value: int | str) -> bool:
+    if isinstance(value, int) or (isinstance(value, str) and value.isdigit()):
+        return True
+    return False
