@@ -41,7 +41,7 @@ def test_core():
     dynaconf_core.merge_pending()
     assert default_namespace.data == {"a": {"x": 1, "y": False}}
 
-    # evalute
+    # TODO: evalute
     dynaconf_core.evaluate_pending()
 
-    # validate
+    # TODO: validate
