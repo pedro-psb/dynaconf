@@ -286,23 +286,31 @@ class NamespaceSet:
         self.current = "default"
         self.patch_engine = patch_engine
         self.registries = registries
-        self.namespaces: dict[str, NamespaceState] = {
-            "default": NamespaceState("default", registries, patch_engine),
-            # TODO: consider using 'main' when namespaces are disabled, so
-            # it we always have at least: ns-main + ns-default (fallback)
-            # For now its not being used and default is also the main.
-            "main": NamespaceState("main", registries, patch_engine),
-            "_internal": NamespaceState("_internal", registries, patch_engine),
-            "_frontend": NamespaceState("_frontend", registries, patch_engine),
-        }
+        self.namespaces: dict[str, NamespaceState] = {}
+        # initial namespaces
+        # TODO: consider using 'main' when namespaces are disabled, so
+        # it we always have at least: ns-main + ns-default (fallback)
+        # For now its not being used and default is also the main.
+        self.create("default")
+        self.create("main")
+        # special namespaces
+        # * _internal: Used for dynaconf dynamic internal settings
+        # * _front-end: A reference to the user-facing settings object
+        self.create("_internal")
+        self.create("_frontend")
 
     def update_frontend(self):
-        """Update the frontend namespace object."""
+        """Update the frontend namespace object with the active ns.data."""
         front_ns = self.get("_frontend")
         front_ns.data.clear()
         current_ns = self.get()
         for k, v in current_ns.data.items():
             front_ns.data[k] = v
+
+    def create(self, name: str):
+        if name in self.namespaces:
+            raise KeyError("Namespace already exist.")
+        self.namespaces[name] = NamespaceState(name, self.registries, self.patch_engine)
 
     def get(self, namespace=None) -> NamespaceState:
         namespace = namespace or self.current
