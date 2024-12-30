@@ -3,7 +3,7 @@ from graphlib import TopologicalSorter
 from typing import Generic, TypeVar, Set, Dict, List, Optional, Tuple, Sequence
 from heapq import heappush, heappop
 from dataclasses import dataclass
-from enum import Enum
+from enum import IntEnum
 
 
 T = TypeVar("T")
@@ -41,38 +41,46 @@ class Queue(LinearDataStructure):
         self._data.insert(0, item)
 
 
-@dataclass
-class Priority:
-    priority: int
-    flag: PriorityGroup
-
-
-class PriorityGroup(Enum):
+class PriorityGroup(IntEnum):
     GREEN = 0
     ORANGE = 1
     RED = 2
 
 
+@dataclass
+class PriorityField:
+    priority: int = 0
+    group: PriorityGroup = PriorityGroup.GREEN
+
+
 class PriorityQueue(Generic[T]):
-    PRIO_GROUPS = PriorityGroup
+    PRIORITY_GROUP_SET = PriorityGroup
 
     def __init__(self):
         self._queue: List[Tuple[int, int, T]] = []
         self._index: int = 0
+        self._item_tuple_index = 3  # in the tuple
 
     def push(self, item: T) -> None:
-        heappush(self._queue, (item.order, self._index, item))
+        try:
+            group = item.priority_field.group
+            priority = item.priority_field.priority
+        except AttributeError:
+            raise RuntimeError(
+                "PriorityQueue items should have an attribute 'priority_field: PriorityField'."
+            )
+        heappush(self._queue, (-group, -priority, self._index, item))
         self._index += 1
 
     def pop(self) -> Optional[T]:
         if not self._queue:
             return None
-        return heappop(self._queue)[2]
+        return heappop(self._queue)[self._item_tuple_index]
 
     def peek(self) -> Optional[T]:
         if not self._queue:
             return None
-        return self._queue[0][2]
+        return self._queue[0][self._item_tuple_index]
 
     def is_empty(self) -> bool:
         return len(self._queue) == 0
