@@ -2,7 +2,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from dynaconflib.exceptions import DynaconfNotInitialized
 from .load import LoadRequest
-from contextlib import contextmanager
 
 if TYPE_CHECKING:
     from dynaconflib.core import DynaconfCore
@@ -22,21 +21,15 @@ class BaseDynaconfData:
             raise DynaconfNotInitialized("Dynaconf not initialized.")
         return dynaconf_core
 
-    @contextmanager
-    def __dynaconf_setmode__(self):
-        metadata_set(self, "internal_setmode", True)
-        try:
-            yield
-        finally:
-            metadata_set(self, "internal_setmode", False)
-
     def __repr__(self):
         return f"{self.__class__.__name__}({self.__dict__})"
 
 
 class DataDict(dict, BaseDynaconfData):
     def __init__(self, *args, **kwargs):
-        self.__node_metadata__ = {"path": None, "internal_setmode": False}
+        # * TODO: to ensure that, all nested dict/list should be DataDict and DataList
+        # setmode = metadata_get(self, "internal_setmode")
+        self.__node_metadata__ = {"path": None}
         super().__init__(*args, **kwargs)
 
     def __setitem__(self, k, v):
@@ -48,29 +41,19 @@ class DataDict(dict, BaseDynaconfData):
             super().__setitem__(key, v)
             return
 
-        # 'setmode' marks a state where we can directly set on the DataDict
-        #
-        # * Direct setting should only happen internally on the patch process.
-        #   This ensures there is a single setpoint where ALL data passes, so
-        #   we can safely record inspect data and have a consistent set workflow.
-        # * When called from another context (e.g the user calls it), it is not in
-        #   setmode, so it trigger a load/patch workflow, that is then able to save
-        #   the data in the DataDict|DataList
-        # * TODO: to ensure that, all nested dict/list should be DataDict and DataList
-        setmode = metadata_get(self, "internal_setmode")
-        if setmode:
+        # Internal vs User __setattr__ calls:
+        # * Set calls from user must pass through the ingestion pipeline
+        # * Set calls from core (internal) are set normally
+        called_from_core = core.status == core.STATUS_SET.MERGING
+        called_from_user = not called_from_core
+        if called_from_core:
             super().__setitem__(k, v)
-        else:
+        elif called_from_user:
             load_request = LoadRequest(
                 "builtin.direct", "__setattr__", direct_data={k: v}
             )
-            core.enqueue_load_request(load_request)
-            core.load_pending()
-            current_ns = core.namespaces.get()
-            with self.__dynaconf_setmode__():
-                current_ns.process_loaded(core.patch_engine)
-                current_ns.process_patches(core.patch_engine)
-                core.update_frontend()
+            core.enqueue(load_request=load_request)
+            core.process_api(load=all, merge=all)
 
     def __repr__(self):
         instance_id = None
@@ -106,9 +89,3 @@ def test_dynaconf_data_dict():
     core = DynaconfCore("test", SchemaTree())
     data.__init_dynaconf__(core)
     assert core == data.__get_dynaconf__()
-
-    # assert setmode
-    assert metadata_get(data, "internal_setmode") is False
-    with data.__dynaconf_setmode__():
-        assert metadata_get(data, "internal_setmode") is True
-    assert metadata_get(data, "internal_setmode") is False

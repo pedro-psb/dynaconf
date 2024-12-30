@@ -19,29 +19,29 @@ def test_core():
     # load/merge 1
     data_input = {"a": {"x": 1, "y": True}}
     load_request = create_load_request(data_input)
-    dynaconf_core.enqueue_load_request(load_request)
+    dynaconf_core.enqueue(load_request=load_request)
     assert load_request in dynaconf_core.pending_load_request
 
-    dynaconf_core.load_pending()
+    dynaconf_core.process_api(load=all)
     assert load_request not in dynaconf_core.pending_load_request
 
     assert default_namespace.data == DataDict()
-    dynaconf_core.merge_pending()
+    dynaconf_core.process_api(merge=all)
     assert default_namespace.data == data_input
 
     # load/merge 2
     data_input = {"a": {"y": False}}
     load_request = create_load_request(data_input)
-    dynaconf_core.enqueue_load_request(load_request)
+    dynaconf_core.enqueue(load_request=load_request)
     assert load_request in dynaconf_core.pending_load_request
 
-    dynaconf_core.load_pending()
+    dynaconf_core.process_api(load=all)
     assert load_request not in dynaconf_core.pending_load_request
 
-    dynaconf_core.merge_pending()
+    dynaconf_core.process_api(merge=all)
     assert default_namespace.data == {"a": {"x": 1, "y": False}}
 
     # TODO: evalute
-    dynaconf_core.evaluate_pending()
+    dynaconf_core.process_api(merge_lazy=all)
 
     # TODO: validate

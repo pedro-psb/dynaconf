@@ -29,21 +29,18 @@ def Dynaconf(schema: type[T] = DynaconfFront, *args, **kwargs) -> T:
 
     # load workflow
     init_load_request = LoadRequest("builtin.direct", "init", direct_data=data)
-    dynaconf_core.enqueue_load_request(init_load_request)
+    dynaconf_core.enqueue(load_request=init_load_request)
     for load_declaration in load_declaration_list:
         for load_request in load_declaration:
-            dynaconf_core.enqueue_load_request(load_request)
-    dynaconf_core.load_pending()
+            dynaconf_core.enqueue(load_request=load_request)
+    dynaconf_core.process_api(load=all)
 
     # preload_request are discovered dynamically and should be merged first
     for preload_request in dynaconf_core.get_preload_requests():
-        dynaconf_core.enqueue_load_request(preload_request)
-    dynaconf_core.load_pending(preload=True)
+        dynaconf_core.enqueue(load_request=preload_request)
+    dynaconf_core.process_api(load=all)
 
     # merge workflow
-    dynaconf_core.merge_pending()
+    dynaconf_core.process_api(merge=all)
     dynaconf_core.validate("_frontend")
-
-    # update _active data
-    dynaconf_core.namespaces.update_frontend()
     return settings
