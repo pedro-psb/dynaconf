@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import NamedTuple, Optional, Callable, TYPE_CHECKING
-from .linear import Stack
+from .standard import Stack
 import re
 
 if TYPE_CHECKING:

@@ -1,5 +1,5 @@
 from __future__ import annotations
-from .classic import Graph
+from .standard import Graph
 from .schema import SchemaTree, SchemaNode
 from typing import Any, NamedTuple, TYPE_CHECKING
 from dynaconflib.utils import type_guard
