@@ -28,11 +28,14 @@ def Dynaconf(schema: type[T] = DynaconfFront, *args, **kwargs) -> T:
     front_ns.data = settings
 
     # load workflow
-    init_load_request = LoadRequest("builtin.direct", "init", direct_data=data)
-    dynaconf_core.enqueue(load_request=init_load_request)
+    load_request_direct = LoadRequest("builtin.direct", "init", direct_data=data)
+    load_request_environ = LoadRequest("builtin.environ", "init")
+
+    dynaconf_core.enqueue(load_request=load_request_direct)
     for load_declaration in load_declaration_list:
         for load_request in load_declaration:
             dynaconf_core.enqueue(load_request=load_request)
+    dynaconf_core.enqueue(load_request=load_request_environ)
     dynaconf_core.process_api(load=all)
 
     # preload_request are discovered dynamically and should be merged first

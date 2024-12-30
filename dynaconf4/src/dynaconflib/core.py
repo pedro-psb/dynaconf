@@ -134,7 +134,9 @@ class DynaconfCore:
         self.namespaces = NamespaceSet(self.registries, self.patch_engine)
         self.status = self.STATUS_SET.WAITING
         # load
-        self.load_context = LoadContext(schema_tree=self.schema)
+        self.load_context = LoadContext(
+            schema_tree=self.schema, schema_strict=schema.strict
+        )
         self.load_request_q = PriorityQueue[LoadRequest]()
 
     def enqueue(self, *, load_request: LoadRequest):

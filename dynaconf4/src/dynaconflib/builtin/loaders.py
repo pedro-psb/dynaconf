@@ -26,7 +26,9 @@ class DirectLoader(BaseLoader):
     def load(self, load_request: LoadRequest, load_context: LoadContext):
         direct_data = load_request.direct_data
         if direct_data is None:
-            raise ValueError(f"Direct loader requires data to be passed.\n{load_request=}")
+            raise ValueError(
+                f"Direct loader requires data to be passed.\n{load_request=}"
+            )
         type_guard(load_request.direct_data, dict)
         return LoadResult([direct_data], load_request, load_context)
 
@@ -77,7 +79,7 @@ class EnvLoader(BaseLoader):
         except KeyError as e:
             if schema_strict:
                 raise LoadError(f"Key not found in schema. {e}.\n{schema=}")
-            schema_path = schema.create_dummy_schema_path(raw_path)
+            schema_path = schema.create_default_schema_path(raw_path)
         return EnvLoader.schema_path_to_data(schema_path, value)
 
     @staticmethod

@@ -27,6 +27,7 @@ class SchemaTree:
         self.type_map = {}
         self.root = SchemaNode("root", str, dict, str)
         self.defaults_map = {}
+        self.strict = False
 
     @classmethod
     def from_cls(cls, schema_cls: type) -> SchemaTree:
