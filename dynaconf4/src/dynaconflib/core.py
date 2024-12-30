@@ -98,7 +98,7 @@ from dynaconflib.datastructures import (
     PatchEngine,
 )
 from dynaconflib.registry import RegistrySet
-from dynaconflib.utils import type_guard, raise_if, setup_limit
+from dynaconflib.utils import type_guard, raise_if, setup_limit, xor
 from typing import Optional
 from dynaconflib.exceptions import UnknownNamespace
 from enum import Enum, auto
@@ -122,13 +122,12 @@ class DynaconfCore:
         self.id = id
         self.schema = schema
         self.registries = RegistrySet().setup_builtin()
-        self.namespaces = NamespaceSet(self.registries)
+        self.patch_engine = PatchEngine(self.registries.patch_operations, self.schema)
+        self.namespaces = NamespaceSet(self.registries, self.patch_engine)
         self.status = self.STATUS_SET.WAITING
         # load
         self.load_context = LoadContext(schema_tree=self.schema)
         self.pending_load_request: list[LoadRequest] = []
-        # merge
-        self.patch_engine = PatchEngine(self.registries.patch_operations, self.schema)
 
     def enqueue(self, *, load_request: LoadRequest):
         self.pending_load_request.append(load_request)
@@ -155,18 +154,18 @@ class DynaconfCore:
 
         # global.loadRequestQ -> ns.loadedQ
         queue_len = len(self.pending_load_request)
-        for _ in range(min(queue_len, load_limit)):
+        for i in range(min(queue_len, load_limit)):
             self._load(namespace_filter=namespaces)
 
         for ns_state in namespaces:
             # ns.LoadedQ -> ns.PatchQ -> ns.PatchLazyQ
             queue_len = len(ns_state.loaded_q)
-            for _ in range(min(queue_len, merge_limit)):
+            for i in range(min(queue_len, merge_limit)):
                 self._merge(ns_state)
 
             # ns.PatchLazyQ -> Done
             queue_len = len(ns_state.patch_lazy_q)
-            for _ in range(min(queue_len, merge_lazy_limit)):
+            for i in range(min(queue_len, merge_lazy_limit)):
                 self._merge_lazy(ns_state)
 
     def validate(self, namespace=None):
@@ -192,13 +191,15 @@ class DynaconfCore:
             loader = self.registries.loaders.get(load_request.loader_id)
             result = loader.load(load_request, self.load_context)
             for ns, data_parts in result.items():
-                self.namespaces.get(ns).enqueue_loaded(data_parts)
+                self.namespaces.get(ns).enqueue(
+                    loaded_parts=data_parts, load_request=load_request
+                )
 
     def _merge(self, ns_state: NamespaceState):
         """Merge one item from ns.load_q into ns.main."""
         with self.status_context(self.STATUS_SET.MERGING):
-            ns_state.process_loaded(self.patch_engine)
-            ns_state.process_patches(self.patch_engine)
+            ns_state.process_loaded()
+            ns_state.process_patch()
             self.namespaces.update_frontend()
 
     def _merge_lazy(self, ns_state: NamespaceState):
@@ -220,33 +221,59 @@ class DynaconfCore:
 
 
 class NamespaceState:
-    def __init__(self, name, registry_set: RegistrySet):
+    def __init__(self, name, registry_set: RegistrySet, patch_engine: PatchEngine):
         # common
         self.name = name
         self.registry_set = registry_set
+        self.patch_engine = patch_engine
         self.data = DataDict()
         # pending queues
-        self.loaded_q: list[dict] = []
-        self.patch_q: list[Patch] = []
-        self.patch_lazy_q: list[Patch] = []
+        self.loaded_q: list[ProcUnit] = []
+        self.patch_q: list[ProcUnit] = []
+        self.patch_lazy_q: list[ProcUnit] = []
 
-    def enqueue_loaded(self, data_parts: list[dict]):
-        self.loaded_q.extend(data_parts)
+    def enqueue(self, *, loaded_parts: list[dict], load_request: LoadRequest):
+        self.loaded_q.append(ProcUnit(loaded_parts, load_request))
 
-    def process_loaded(self, patch_engine: PatchEngine):
-        """Process all data in pending_loaded or until limit is reached."""
-        loaded_data = self.loaded_q.pop()
-        patch_list = patch_engine.create(loaded_data)
-        self.patch_q.extend(patch_list)
+    def process_loaded(self):
+        """Process one ProcUnit from loaded_q."""
+        if not self.loaded_q:
+            return
+        # get and process
+        proc_unit = self.loaded_q.pop()
+        loaded_parts = proc_unit.loaded
+        all_patches = []
+        for load_part in loaded_parts:
+            all_patches.extend(self.patch_engine.create(load_part))
+        # update processing unit
+        patches_immediate = []
+        patches_lazy = []
+        for patch in all_patches:
+            if patch.lazy is False:
+                patches_immediate.append(patch)
+            else:
+                patches_lazy.append(patch)
+        proc_unit.update(patches=patches_immediate, patches_lazy=patches_lazy)
+        # update namespace queues
+        self.patch_q.append(proc_unit)
+        self.patch_lazy_q.append(proc_unit)
 
-    def process_patches(self, patch_engine: PatchEngine):
-        patches = []
-        while self.patch_q:
-            if not self.patch_q[-1].lazy:
-                patches.append(self.patch_q.pop(0))
-        patch_engine.apply(self.data, patches)
+    def process_patch(self):
+        """Process one ProcUnit from patch_q."""
+        if not self.patch_q:
+            return
+        proc_unit = self.patch_q.pop()
+        patches = proc_unit.patches
+        self.patch_engine.apply(self.data, patches)
+        proc_unit.patches.clear()
 
-    def process_patches_lazy(self): ...
+    def process_patches_lazy(self):
+        """Process one ProcUnit from patch_lazy_q."""
+        if not self.patch_lazy_q:
+            return
+        proc_unit = self.patch_lazy_q.pop()
+        patches_lazy = proc_unit.patches_lazy
+        self.patch_engine.apply(self.data, patches_lazy)
 
     def validate(self): ...
 
@@ -255,16 +282,18 @@ class NamespaceState:
 
 
 class NamespaceSet:
-    def __init__(self, registries: RegistrySet):
+    def __init__(self, registries: RegistrySet, patch_engine: PatchEngine):
         self.current = "default"
+        self.patch_engine = patch_engine
+        self.registries = registries
         self.namespaces: dict[str, NamespaceState] = {
-            "default": NamespaceState("default", registries),
+            "default": NamespaceState("default", registries, patch_engine),
             # TODO: consider using 'main' when namespaces are disabled, so
             # it we always have at least: ns-main + ns-default (fallback)
             # For now its not being used and default is also the main.
-            "main": NamespaceState("main", registries),
-            "_internal": NamespaceState("_internal", registries),
-            "_frontend": NamespaceState("_frontend", registries),
+            "main": NamespaceState("main", registries, patch_engine),
+            "_internal": NamespaceState("_internal", registries, patch_engine),
+            "_frontend": NamespaceState("_frontend", registries, patch_engine),
         }
 
     def update_frontend(self):
@@ -295,9 +324,8 @@ class NamespaceSet:
             return False
         return True
 
-    def set_current_namespace(self, namespace: str):
-        if namespace not in self.namespaces:
-            raise KeyError(f"Namespace doesn't exist: {namespace}")
+    def set_current(self, namespace: str):
+        self.exists(namespace, raises=True)
         self.current = namespace
 
     def items(self):
@@ -308,3 +336,34 @@ class NamespaceSet:
 
     def __repr__(self):
         return f"{self.__class__.__name__}({self.current=}, {self.namespaces=})"
+
+
+class ProcUnit:
+    def __init__(self, loaded: list[dict], load_request: LoadRequest):
+        self.load_request = load_request
+        self.loaded = loaded
+        self.patches = []
+        self.patches_lazy = []
+
+    def update(
+        self,
+        *,
+        patches: Optional[list[Patch]] = None,
+        patches_lazy: Optional[list[Patch]] = None,
+    ):
+        if patches:
+            self.patches = patches
+        if patches_lazy:
+            self.patches_lazy = patches_lazy
+
+    def is_done(self):
+        return self.loaded and self.patches and self.patches_lazy
+
+    def clear(self):
+        self.load_request = None
+        self.loaded.clear()
+        self.patches.clear()
+        self.patches_lazy.clear()
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}(uri={self.load_request.uri!r}, {self.loaded=}, {self.patches=}, {self.patches_lazy=})"

@@ -1,6 +1,10 @@
 Empty = object()
 
 
+def xor(a, b) -> bool:
+    return a and b or not (a or b)
+
+
 def setup_limit(limit):
     """Use positive int or infinity limit."""
     limit = limit or 0
@@ -9,9 +13,11 @@ def setup_limit(limit):
         raise ValueError(f"Limit should be a positive int. Got {limit}.")
     return n
 
+
 def raise_if(condition: bool, exception, e_args=None):
     if condition:
         raise exception()
+
 
 def type_guard(obj, t: type | tuple[type]):
     if not isinstance(obj, t):
