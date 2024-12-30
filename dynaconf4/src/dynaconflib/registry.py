@@ -5,17 +5,10 @@ from dynaconflib.datastructures import (
     Validator,
     BasePatchOperation,
 )
-from dataclasses import dataclass
 
 
 class BaseRegistry:
-    ids = set()
-
     def __init__(self, id: str, instance_cls: type):
-        if id in BaseRegistry.ids:
-            raise KeyError("Id already exists")
-        BaseRegistry.ids.add(id)
-
         self.id = id
         self.data = {}
         self.instance_cls = instance_cls
@@ -40,12 +33,12 @@ PatchOpRegistry = partial(BaseRegistry, instance_cls=BasePatchOperation)
 ValidatorRegistry = partial(BaseRegistry, instance_cls=Validator)
 
 
-@dataclass
 class RegistrySet:
-    token_callbacks = TokenCallbackRegistry("token_callbacks")
-    patch_operations = PatchOpRegistry("merge_operations")
-    validators = ValidatorRegistry("validators")
-    loaders = LoaderRegistry("loaders")
+    def __init__(self):
+        self.token_callbacks = TokenCallbackRegistry("token_callbacks")
+        self.patch_operations = PatchOpRegistry("merge_operations")
+        self.validators = ValidatorRegistry("validators")
+        self.loaders = LoaderRegistry("loaders")
 
     def setup_builtin(self):
         from dynaconflib.builtin import (

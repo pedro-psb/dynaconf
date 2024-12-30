@@ -1,6 +1,5 @@
-from dynaconflib.registry import TokenCallbackRegistry
 from dynaconflib.datastructures import DynaconfToken
-from dynaconflib.builtin.token_callbacks import setup_tokens, int_fn, str_fn, sum_fn
+from dynaconflib.builtin.token_callbacks import int_fn, str_fn, sum_fn
 from dataclasses import dataclass
 import pytest
 import rich
@@ -12,9 +11,6 @@ class Case:
     input: str
     expected: DynaconfToken
 
-
-token_registry = TokenCallbackRegistry("default")
-setup_tokens(token_registry)
 
 # T = token string, e.g @foo
 # A = token argument string (not split), e.g: @foo 'this is a single arg'
@@ -70,7 +66,8 @@ def debug_diff(result, expected):
 
 
 @pytest.mark.parametrize("case", cases)
-def test_tokenizer(case):
+def test_tokenizer(case, registries):
+    token_registry = registries.token_callbacks
     result = DynaconfToken.create(case.input, token_registry)
     debug_diff(result, case.expected)
     assert result == case.expected

@@ -1,5 +1,5 @@
 from .data import DataDict, DataList
-from .load import BaseLoader, LoadRequest, LoadContext, LoadResult
+from .load import BaseLoader, LoadRequest, LoadContext, LoadResult, LoadDeclaration
 from .patch import Patch, PatchEngine, BasePatchOperation
 from .token import DynaconfToken, TokenCallback
 from .validate import Validator
@@ -16,6 +16,7 @@ __all__ = [
     "LoadRequest",
     "LoadContext",
     "LoadResult",
+    "LoadDeclaration",
     "DynaconfToken",
     "TokenCallback",
     "Validator",

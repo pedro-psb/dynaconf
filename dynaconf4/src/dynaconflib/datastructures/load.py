@@ -92,6 +92,16 @@ class LoadResult:
         return repr(self._data_by_ns)
 
 
+class LoadDeclaration:
+    """Base class for creating LoadRequests with a convenient user API."""
+
+    def __init__(self):
+        self.load_requests: list[LoadRequest] = []
+
+    def __iter__(self):
+        yield from self.load_requests
+
+
 class BaseLoader:
     def __init__(self, id: str):
         self.id = id

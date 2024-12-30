@@ -1,12 +1,7 @@
 from dynaconflib.datastructures import Patch, DataDict, PatchEngine, SchemaTree
-from dynaconflib.registry import PatchOpRegistry
-from dynaconflib.builtin.patch_operations import setup_patch_operations
 import pytest
 from dataclasses import dataclass, field
 from typing import Optional
-
-patch_registry = PatchOpRegistry("patch_operation")
-setup_patch_operations(patch_registry)
 
 
 @dataclass
@@ -144,7 +139,8 @@ def get_ids_patch(scenarios):
 
 
 @pytest.mark.parametrize("scenario", scenarios, ids=get_ids(scenarios))
-def test_patch_apply(scenario: Scenario):
+def test_patch_apply(scenario: Scenario, registries):
+    patch_registry = registries.patch_operations
     schema = SchemaTree()
     patch_engine = PatchEngine(patch_registry, schema)
 
@@ -156,7 +152,8 @@ def test_patch_apply(scenario: Scenario):
 @pytest.mark.parametrize(
     "scenario", patch_scenarios(scenarios), ids=get_ids_patch(scenarios)
 )
-def test_patch_create(scenario: Scenario):
+def test_patch_create(scenario: Scenario, registries):
+    patch_registry = registries.patch_operations
     schema = SchemaTree()
     patch_engine = PatchEngine(patch_registry, schema)
 

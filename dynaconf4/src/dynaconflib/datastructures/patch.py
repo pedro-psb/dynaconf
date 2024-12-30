@@ -1,11 +1,11 @@
 from __future__ import annotations
-from .data import DataDict, DataList
 from .classic import Graph
 from .schema import SchemaTree, SchemaNode
 from typing import Any, NamedTuple, TYPE_CHECKING
 from dynaconflib.utils import type_guard
 
 if TYPE_CHECKING:
+    from .data import DataDict
     from dynaconflib.registry import PatchOpRegistry
 
 
@@ -18,7 +18,7 @@ class Patch(NamedTuple):
 
 
 class BasePatchOperation:
-    def apply(self, data: dict | list, key, value):
+    def apply(self, data: DataDict | list, key, value):
         if isinstance(data, list):
             return self.on_list(data, key, value)
         elif isinstance(data, dict):

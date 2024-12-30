@@ -25,8 +25,8 @@ def setup_loaders(registry: LoaderRegistry):
 class DirectLoader(BaseLoader):
     def load(self, load_request: LoadRequest, load_context: LoadContext):
         direct_data = load_request.direct_data
-        if not direct_data:
-            raise ValueError("Direct loader requires data to be passed.")
+        if direct_data is None:
+            raise ValueError(f"Direct loader requires data to be passed.\n{load_request=}")
         type_guard(load_request.direct_data, dict)
         return LoadResult([direct_data], load_request, load_context)
 

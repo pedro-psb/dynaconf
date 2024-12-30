@@ -1,5 +1,5 @@
+from __future__ import annotations
 from typing import NamedTuple
-from dynaconflib.utils import is_last
 
 
 class SchemaNode(NamedTuple):
@@ -26,6 +26,12 @@ class SchemaTree:
     def __init__(self):
         self.type_map = {}
         self.root = SchemaNode("root", str, dict, str)
+        self.defaults_map = {}
+
+    @classmethod
+    def from_cls(cls, schema_cls: type) -> SchemaTree:
+        # TODO: actually parse the type info into SchemaNodes
+        return SchemaTree()
 
     def add(self, key_path, value_type, children_key_type=str, default=None):
         """

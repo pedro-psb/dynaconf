@@ -41,24 +41,51 @@ Each namespace is represented by a NamespaceState, which holds queues
 for pending intermediary datastructures, like loaded data (but not merged),
 patches ready to be applied and lazy patches, that should be applied later.
 
+In this step, tokens, converteres and dynamic values are evaluated when
+possible or moved to the lazyQ.
+
      namespace-k
     +------------------------------------------------+
     | base: DataDict                                 |
     |                                                |
-    |    pending_loaded                              |
+    |    pending_loaded Q                            |
     |          |                                     |
     |          | create_patch(loaded) -> Patch       |
     |          |                                     |
-    |    pending_patch                               |
+    |    pending_patch Q                             |
     |          |                                     |
     |          | apply_patch(base, Patch) -> Patch   |
     |          |                                     |
-    |  pending_patch_lazy                            |
+    |  pending_patch_lazy Q                          |
     |          |                                     |
     |          | apply_lazy_patch(base, Patch)       |
     |          x                                     |
     +------------------------------------------------+
 
+
+## Default System
+
+The 'default' namespace (ns-default) always exist and it's content is the access-time
+fallback for when the activate namespace doesnt contain the requested key. The system
+is a simple implementation of a ChainMap using dynaconf internals.
+
+The ns-default content comes first from the schema declaration, then from loaded data.
+
+Example:
+
+    Given the namespace content:
+    * ns-default = {'a': 0, 'b': 0}
+    * ns-dev = {'a': 1}
+
+    Then:
+    ```python
+    >>> settings['a']  # active env has the key, use its value
+    1
+    >>> settings['b']  # activate env dont have the key, try ns-default
+    0
+    >>> settings['c']  # ns-default doesnt have it either
+    KeyError: ...
+    ```
 """
 
 from __future__ import annotations
@@ -72,7 +99,8 @@ from dynaconflib.datastructures import (
     PatchEngine,
 )
 from dynaconflib.registry import RegistrySet
-from dynaconflib.utils import type_guard
+from dynaconflib.utils import type_guard, setup_limit
+from typing import Optional
 
 
 class DynaconfCore:
@@ -91,16 +119,25 @@ class DynaconfCore:
     def enqueue_load_request(self, load_request: LoadRequest):
         self.pending_load_request.append(load_request)
 
-    def load_pending(self):
-        """Load pending requests and add to namespaces."""
+    def load_pending(self, preload=False, limit: Optional[int] = None):
+        """
+        Load pending requests and add to namespaces.
+
+        Params:
+            preload: If the loading data should be put in front of pending_loaded Q.
+            limit: Limit the number of LoadRequest to be consumed. Default: consume all.
+        """
+
         # TODO handle strict and loose namespace
         # e.g, raise when unknown namespace is loaded or create if doesnt exist
-        while self.pending_load_request:
+        i, limit = setup_limit(limit)
+        while self.pending_load_request and i < limit:
             load_request = self.pending_load_request.pop()
             loader = self.registries.loaders.get(load_request.loader_id)
             result = loader.load(load_request, self.load_context)
             for ns, data_parts in result.items():
                 self.namespaces.get(ns).enqueue_loaded(data_parts)
+            i += 1
 
     def merge_pending(self, namespace=None):
         """Merge pending loaded data into namespace main data."""
@@ -117,6 +154,27 @@ class DynaconfCore:
             ns_state = self.namespaces.get(namespace)
             ns_state.process_patches_lazy()
 
+    def validate(self, namespace=None):
+        """Validate data from namespace main data."""
+
+    def get_preload_requests(self) -> list[LoadRequest]:
+        """Get preload request from namespace's pending_loaded."""
+        return []
+
+    def update_frontend(self):
+        self.namespaces.update_frontend()
+
+    def debug(self):
+        s = "    "
+        print(f"\n{self.pending_load_request=}")
+        print("namespaces:")
+        for k, ns in self.namespaces.items():
+            print(f"{s}- {k}")
+            print(f"{s*2}{ns.data=}")
+            print(f"{s*2}{ns.pending_loaded=}")
+            print(f"{s*2}{ns.pending_patch=}")
+            print(f"{s*2}{ns.pending_patch_lazy=}")
+
 
 class NamespaceState:
     def __init__(self, name, registry_set: RegistrySet):
@@ -125,6 +183,7 @@ class NamespaceState:
         self.registry_set = registry_set
         self.data = DataDict()
         # pending queues
+        # TODO: pending_loaded should preserve LoadRequest.order (priority)
         self.pending_loaded: list[dict] = []
         self.pending_patch: list[Patch] = []
         self.pending_patch_lazy: list[Patch] = []
@@ -132,11 +191,14 @@ class NamespaceState:
     def enqueue_loaded(self, data_parts: list[dict]):
         self.pending_loaded.extend(data_parts)
 
-    def process_loaded(self, patch_engine: PatchEngine):
-        while self.pending_loaded:
+    def process_loaded(self, patch_engine: PatchEngine, limit: Optional[int] = None):
+        """Process all data in pending_loaded or until limit is reached."""
+        i, limit = setup_limit(limit)
+        while self.pending_loaded and i < limit:
             loaded_data = self.pending_loaded.pop()
             patch_list = patch_engine.create(loaded_data)
             self.pending_patch.extend(patch_list)
+            i += 1
 
     def process_patches(self, patch_engine: PatchEngine):
         patches = []
@@ -149,14 +211,30 @@ class NamespaceState:
 
     def validate(self): ...
 
+    def __repr__(self):
+        return f"{self.__class__.__name__}({self.name=}, {self.data=})"
+
 
 class NamespaceSet:
     def __init__(self, registries: RegistrySet):
         self.current = "default"
         self.namespaces: dict[str, NamespaceState] = {
             "default": NamespaceState("default", registries),
+            # TODO: consider using 'main' when namespaces are disabled, so
+            # it we always have at least: ns-main + ns-default (fallback)
+            # For now its not being used and default is also the main.
+            "main": NamespaceState("main", registries),
             "_internal": NamespaceState("_internal", registries),
+            "_frontend": NamespaceState("_frontend", registries),
         }
+
+    def update_frontend(self):
+        """Update the frontend namespace object."""
+        front_ns = self.get("_frontend")
+        front_ns.data.clear()
+        current_ns = self.get()
+        for k, v in current_ns.data.items():
+            front_ns.data[k] = v
 
     def get(self, namespace=None) -> NamespaceState:
         namespace = namespace or self.current
@@ -172,3 +250,6 @@ class NamespaceSet:
 
     def keys(self):
         return self.namespaces.keys()
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}({self.current=}, {self.namespaces=})"

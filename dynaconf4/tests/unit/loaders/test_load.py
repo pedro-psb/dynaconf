@@ -1,11 +1,6 @@
 from dynaconflib.datastructures import LoadRequest, LoadContext, SchemaTree, Index
-from dynaconflib.builtin import setup_loaders
-from dynaconflib.registry import LoaderRegistry
 from dataclasses import dataclass
 import pytest
-
-load_registry = LoaderRegistry("load_test")
-setup_loaders(load_registry)
 
 
 @dataclass
@@ -104,7 +99,8 @@ scenarios = [
 
 
 @pytest.mark.parametrize("scenario", scenarios)
-def test_load(scenario: Scenario, monkeypatch):
+def test_load(scenario: Scenario, monkeypatch, registries):
+    load_registry = registries.loaders
     # setup schema
     schema = SchemaTree()
     schema_items = scenario.schema_items or []
