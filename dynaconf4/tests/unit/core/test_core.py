@@ -14,7 +14,7 @@ def test_core():
     schema.add(["a", "x"], int)
     schema.add(["a", "y"], bool)
     core = DynaconfCore("dynaconf_test", schema)
-    default_namespace = core.namespaces.get()
+    default_namespace = core.namespaces.get_current()
 
     # load/merge 1
     data_input = {"a": {"x": 1, "y": True}}

@@ -294,7 +294,7 @@ class NamespaceState:
 
 class NamespaceSet:
     def __init__(self, registries: RegistrySet, patch_engine: PatchEngine):
-        self.current = "default"
+        self._current = "default"
         self.patch_engine = patch_engine
         self.registries = registries
         self.namespaces: dict[str, NamespaceState] = {}
@@ -314,7 +314,7 @@ class NamespaceSet:
         """Update the frontend namespace object with the active ns.data."""
         front_ns = self.get("_frontend")
         front_ns.data.clear()
-        current_ns = self.get()
+        current_ns = self.get_current()
         for k, v in current_ns.data.items():
             front_ns.data[k] = v
 
@@ -323,8 +323,11 @@ class NamespaceSet:
             raise KeyError("Namespace already exist.")
         self.namespaces[name] = NamespaceState(name, self.registries, self.patch_engine)
 
-    def get(self, namespace=None) -> NamespaceState:
-        namespace = namespace or self.current
+    def get_current(self) -> NamespaceState:
+        return self.get(self._current)
+
+    def get(self, namespace) -> NamespaceState:
+        self.exists(namespace)
         return self.namespaces[namespace]
 
     def filter(self, namespaces: list[str] | type[all]) -> list[NamespaceState]:
@@ -345,7 +348,7 @@ class NamespaceSet:
 
     def set_current(self, namespace: str):
         self.exists(namespace, raises=True)
-        self.current = namespace
+        self._current = namespace
 
     def items(self):
         return self.namespaces.items()
@@ -354,7 +357,7 @@ class NamespaceSet:
         return self.namespaces.keys()
 
     def __repr__(self):
-        return f"{self.__class__.__name__}({self.current=}, {self.namespaces=})"
+        return f"{self.__class__.__name__}({self._current=}, {self.namespaces=})"
 
 
 class ProcUnit:
