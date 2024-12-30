@@ -23,11 +23,11 @@ class Index(NamedTuple):
 
 
 class SchemaTree:
-    def __init__(self):
+    def __init__(self, strict: bool = False):
         self.type_map = {}
         self.root = SchemaNode("root", str, dict, str)
         self.defaults_map = {}
-        self.strict = False
+        self.strict = strict
 
     @classmethod
     def from_cls(cls, schema_cls: type) -> SchemaTree:
@@ -62,9 +62,15 @@ class SchemaTree:
     def get(self, key_path) -> SchemaNode:
         return self.type_map[tuple(key_path)]
 
-    def create_schema_path(self, raw_path: tuple[str]) -> list[SchemaNode]:
+    def get_path(self, *, from_raw: tuple[str]) -> list[SchemaNode]:
+        if self.strict:
+            return self._create_schema_path(from_raw)
+        else:
+            return self._create_default_schema_path(from_raw)
+
+    def _create_schema_path(self, from_raw: tuple[str]) -> list[SchemaNode]:
         final = []
-        raw_path = tuple(raw_path)
+        raw_path = tuple(from_raw)
         parent_node = self.root
         for i in range(len(raw_path)):
             # take each sub patch from start to i
@@ -82,10 +88,9 @@ class SchemaTree:
             parent_node = current_node
         return final
 
-    def create_default_schema_path(self, raw_path: tuple[str]) -> list[SchemaNode]:
+    def _create_default_schema_path(self, raw_path: tuple[str]) -> list[SchemaNode]:
         final: list[SchemaNode] = []
         raw_path = tuple(raw_path)
-        parent_node = self.root
         for i, node in enumerate(raw_path):
             is_list_item = is_digit(node)
             if is_list_item:

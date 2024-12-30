@@ -102,7 +102,7 @@ scenarios = [
 def test_load(scenario: Scenario, monkeypatch, registries):
     load_registry = registries.loaders
     # setup schema
-    schema = SchemaTree()
+    schema = SchemaTree(strict=True)
     schema_items = scenario.schema_items or []
     for path, t in schema_items:
         schema.add(path, t)

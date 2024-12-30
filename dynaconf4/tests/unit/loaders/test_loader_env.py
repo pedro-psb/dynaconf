@@ -4,7 +4,7 @@ from dynaconflib.utils import Empty
 
 
 def test_schema_get_path():
-    schema = SchemaTree()
+    schema = SchemaTree(strict=True)
     schema.add(["a"], list)
     schema.add(["a", Index()], dict)
     schema.add(["a", Index(), "b"], dict)
@@ -17,13 +17,13 @@ def test_schema_get_path():
         SchemaNode("b", str, dict, str),
         SchemaNode("0", str, int, None),
     ]
-    result = schema.create_schema_path(path)
+    result = schema.get_path(from_raw=path)
     assert result == expected
     assert result[1].key.value == expected[1].key.value
 
 
 def test_envloader_simple():
-    schema = SchemaTree()
+    schema = SchemaTree(strict=True)
     schema.add(["a"], dict)
     schema.add(["a", "b"], dict)
     schema.add(["a", "b", "c"], int)
@@ -36,7 +36,7 @@ def test_envloader_simple():
 
 
 def test_envloader_list():
-    schema = SchemaTree()
+    schema = SchemaTree(strict=True)
     schema.add(["a"], list)
     schema.add(["a", Index()], dict)
     schema.add(["a", Index(), "b"], int)
@@ -49,7 +49,7 @@ def test_envloader_list():
 
 
 def test_envloader_list2():
-    schema = SchemaTree()
+    schema = SchemaTree(strict=True)
     schema.add(["a"], list)
     schema.add(["a", Index()], dict)
     schema.add(["a", Index(), "b"], int)

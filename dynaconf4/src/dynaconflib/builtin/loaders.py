@@ -74,12 +74,7 @@ class EnvLoader(BaseLoader):
         Example:
             path_to_data(["a", "b"]], value) -> {"a": {"b": value}}
         """
-        try:
-            schema_path = schema.create_schema_path(raw_path)
-        except KeyError as e:
-            if schema_strict:
-                raise LoadError(f"Key not found in schema. {e}.\n{schema=}")
-            schema_path = schema.create_default_schema_path(raw_path)
+        schema_path = schema.get_path(from_raw=raw_path)
         return EnvLoader.schema_path_to_data(schema_path, value)
 
     @staticmethod

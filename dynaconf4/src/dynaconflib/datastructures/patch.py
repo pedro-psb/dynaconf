@@ -48,12 +48,7 @@ class PatchEngine:
 
         for patch in patch_list:
             prev_container_v = container_v = base
-            try:
-                schema_path = self.schema.create_schema_path(patch.path)
-            except KeyError:
-                if self.schema_strict:
-                    raise
-                schema_path = self.schema.create_default_schema_path(patch.path)
+            schema_path = self.schema.get_path(from_raw=patch.path)
             # walk to get last container
             for i, node in enumerate(schema_path[:-1]):
                 container_v = prev_container_v[node.key]
