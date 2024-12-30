@@ -96,6 +96,8 @@ from dynaconflib.datastructures import (
     LoadContext,
     SchemaTree,
     PatchEngine,
+    PriorityQueue,
+    PriorityField,
 )
 from dynaconflib.registry import RegistrySet
 from dynaconflib.utils import type_guard, raise_if, setup_limit, xor
@@ -109,6 +111,12 @@ Count = Optional[int | type[all]]
 
 
 class CoreStatus(Enum):
+    """Status of the core instance.
+
+    This is important for DataDict|DataList getters and setters, as these have
+    different behavior if the caller is external (user) or internal (core).
+    """
+
     WAITING = auto()
     LOADING = auto()
     MERGING = auto()
@@ -127,10 +135,11 @@ class DynaconfCore:
         self.status = self.STATUS_SET.WAITING
         # load
         self.load_context = LoadContext(schema_tree=self.schema)
-        self.pending_load_request: list[LoadRequest] = []
+        self.load_request_q = PriorityQueue[LoadRequest]()
 
     def enqueue(self, *, load_request: LoadRequest):
-        self.pending_load_request.append(load_request)
+        """Enqueue load_request into load_request_q."""
+        self.load_request_q.push(load_request)
 
     def process_api(
         self,
@@ -153,7 +162,7 @@ class DynaconfCore:
         merge_lazy_limit = setup_limit(merge_lazy)
 
         # global.loadRequestQ -> ns.loadedQ
-        queue_len = len(self.pending_load_request)
+        queue_len = len(self.load_request_q)
         for i in range(min(queue_len, load_limit)):
             self._load(namespace_filter=namespaces)
 
@@ -187,7 +196,7 @@ class DynaconfCore:
     def _load(self, namespace_filter=None):
         """Load one pending requests and add to namespaces."""
         with self.status_context(self.STATUS_SET.LOADING):
-            load_request = self.pending_load_request.pop()
+            load_request = self.load_request_q.pop()
             loader = self.registries.loaders.get(load_request.loader_id)
             result = loader.load(load_request, self.load_context)
             for ns, data_parts in result.items():
@@ -210,7 +219,7 @@ class DynaconfCore:
 
     def debug(self):
         s = "    "
-        print(f"\n{self.pending_load_request=}")
+        print(f"\n{self.load_request_q=}")
         print("namespaces:")
         for k, ns in self.namespaces.items():
             print(f"{s}- {k}")
@@ -228,16 +237,18 @@ class NamespaceState:
         self.patch_engine = patch_engine
         self.data = DataDict()
         # pending queues
-        self.loaded_q: list[ProcUnit] = []
-        self.patch_q: list[ProcUnit] = []
-        self.patch_lazy_q: list[ProcUnit] = []
+        self.loaded_q = PriorityQueue[ProcUnit]()
+        self.patch_q = PriorityQueue[ProcUnit]()
+        self.patch_lazy_q = PriorityQueue[ProcUnit]()
 
     def enqueue(self, *, loaded_parts: list[dict], load_request: LoadRequest):
-        self.loaded_q.append(ProcUnit(loaded_parts, load_request))
+        self.loaded_q.push(
+            ProcUnit(loaded_parts, load_request, load_request.priority_field)
+        )
 
     def process_loaded(self):
         """Process one ProcUnit from loaded_q."""
-        if not self.loaded_q:
+        if self.loaded_q.is_empty():
             return
         # get and process
         proc_unit = self.loaded_q.pop()
@@ -255,12 +266,12 @@ class NamespaceState:
                 patches_lazy.append(patch)
         proc_unit.update(patches=patches_immediate, patches_lazy=patches_lazy)
         # update namespace queues
-        self.patch_q.append(proc_unit)
-        self.patch_lazy_q.append(proc_unit)
+        self.patch_q.push(proc_unit)
+        self.patch_lazy_q.push(proc_unit)
 
     def process_patch(self):
         """Process one ProcUnit from patch_q."""
-        if not self.patch_q:
+        if self.patch_q.is_empty():
             return
         proc_unit = self.patch_q.pop()
         patches = proc_unit.patches
@@ -269,7 +280,7 @@ class NamespaceState:
 
     def process_patches_lazy(self):
         """Process one ProcUnit from patch_lazy_q."""
-        if not self.patch_lazy_q:
+        if self.patch_lazy_q.is_empty():
             return
         proc_unit = self.patch_lazy_q.pop()
         patches_lazy = proc_unit.patches_lazy
@@ -347,11 +358,17 @@ class NamespaceSet:
 
 
 class ProcUnit:
-    def __init__(self, loaded: list[dict], load_request: LoadRequest):
+    def __init__(
+        self,
+        loaded: list[dict],
+        load_request: LoadRequest,
+        priority_field: PriorityField = PriorityField(),
+    ):
         self.load_request = load_request
         self.loaded = loaded
         self.patches = []
         self.patches_lazy = []
+        self.priority_field = priority_field
 
     def update(
         self,

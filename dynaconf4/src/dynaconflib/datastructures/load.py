@@ -1,6 +1,7 @@
 from __future__ import annotations
 from typing import NamedTuple, Optional
 from .schema import SchemaTree
+from .standard import PriorityField
 from collections import defaultdict
 from dynaconflib.utils import type_guard
 from dynaconflib.exceptions import LoadError
@@ -20,7 +21,7 @@ class LoadRequest(NamedTuple):
 
     loader_id: str
     uri: str
-    order: int = 0
+    priority_field: PriorityField = PriorityField()  # the same instance
     namespace_in_root: bool = None
     namespace_filter: Optional[list] = None
     direct_data: Optional[dict] = None

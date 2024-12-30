@@ -71,7 +71,6 @@ def load_environ(load_request: LoadRequest, load_context: LoadContext):
             container[cur] = next_container
             add_to_tree(next_container, keys[:1], value)
 
-        # breakpoint()
         for keys, value in data_map:
             add_to_tree(root, keys, value)
         return root

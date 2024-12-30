@@ -55,11 +55,11 @@ class PriorityField:
 
 class PriorityQueue(Generic[T]):
     PRIORITY_GROUP_SET = PriorityGroup
+    ITEM_POSITION = 3  # in queue tuple
 
     def __init__(self):
         self._queue: List[Tuple[int, int, T]] = []
         self._index: int = 0
-        self._item_tuple_index = 3  # in the tuple
 
     def push(self, item: T) -> None:
         try:
@@ -75,18 +75,36 @@ class PriorityQueue(Generic[T]):
     def pop(self) -> Optional[T]:
         if not self._queue:
             return None
-        return heappop(self._queue)[self._item_tuple_index]
+        return heappop(self._queue)[self.ITEM_POSITION]
 
     def peek(self) -> Optional[T]:
         if not self._queue:
             return None
-        return self._queue[0][self._item_tuple_index]
+        return self._queue[0][self.ITEM_POSITION]
 
     def is_empty(self) -> bool:
         return len(self._queue) == 0
 
+    def copy(self):
+        return self.__copy__()
+
+    def __contains__(self, item: T) -> bool:
+        return any(ituple[self.ITEM_POSITION] == item for ituple in self._queue)
+
+    def __copy__(self):
+        copy = PriorityQueue()
+        copy._queue = self._queue.copy()
+        copy._index = self._index
+        return copy
+
+    def __iter__(self):
+        yield from (self.copy().pop() for _ in range(len(self)))
+
     def __len__(self) -> int:
         return len(self._queue)
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}({list(self)})"
 
 
 # Graphs
