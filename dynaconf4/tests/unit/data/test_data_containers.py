@@ -37,6 +37,7 @@ def test_data_repr():
     print()
     data_print(data)
     print(data)
+    data_print(data, debug=True)
 
 
 @pytest.mark.parametrize("input", data_set)

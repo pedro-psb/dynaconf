@@ -1,34 +1,27 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
 from dynaconflib.exceptions import DynaconfNotInitialized
-from .load import LoadRequest
 
 if TYPE_CHECKING:
     from dynaconflib.core import DynaconfCore
 
 
 class BaseData:
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.__node_metadata__ = {"path": None}
-        self.__convert_nested__()
-
     def __init_dynaconf__(self, dynaconf_core: DynaconfCore):
-        self.__dynaconf_core__ = dynaconf_core
+        self.__node_metadata__["core"] = dynaconf_core
 
     def __get_dynaconf__(self, raises=True):
-        dynaconf_core = getattr(self, "__dynaconf_core__", None)
+        dynaconf_core = self.__node_metadata__["core"]
         if not dynaconf_core and raises is True:
             raise DynaconfNotInitialized("Dynaconf not initialized.")
         return dynaconf_core
-
-    def __repr__(self):
-        return f"{self.__class__.__name__}({self})"
 
 
 class DataDict(dict, BaseData):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # dont know why I cant move metadata init to the BaseData init
+        self.__node_metadata__ = {"path": None, "core": None}
         convert_containers(self, self.items())
 
     def update(self, data):
@@ -50,14 +43,11 @@ class DataDict(dict, BaseData):
     def __repr__(self):
         return f"{self.__class__.__name__}({dict(self)!r})"
 
-    def __prettyprint__(self):
-        core_id = getattr(self.__get_dynaconf__(raises=False), "id", None)
-        return f"{self.__class__.__name__}(core_id={core_id!r}, {dict(self)!r})"
-
 
 class DataList(list, BaseData):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.__node_metadata__ = {"path": None, "core": None}
         convert_containers(self, enumerate(self))
 
     def copy(self):
