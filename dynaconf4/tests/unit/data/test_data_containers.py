@@ -2,6 +2,7 @@ from dynaconflib.datastructures import DataDict, DataList, SchemaTree
 from dynaconflib.utils import container_items
 from dynaconflib.exceptions import DynaconfNotInitialized
 from dynaconflib.core import DynaconfCore
+from dynaconflib.utils import data_print
 
 import pytest
 
@@ -29,6 +30,13 @@ data_set = (
         [1, [2, {"a": [3]}]],
     ],
 )
+
+
+def test_data_repr():
+    data = DataDict({"a": 1, "b": {"c": [1, 2, 3]}})
+    print()
+    data_print(data)
+    print(data)
 
 
 @pytest.mark.parametrize("input", data_set)

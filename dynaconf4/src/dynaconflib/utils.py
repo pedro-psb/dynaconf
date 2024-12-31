@@ -1,8 +1,14 @@
+import json
+
 Empty = object()
 
 
 def xor(a, b) -> bool:
     return a and b or not (a or b)
+
+
+def data_print(data, format="json", debug=False):
+    print(json.dumps(data, indent=4))
 
 
 def container_items(container: dict | list):

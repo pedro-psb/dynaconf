@@ -23,7 +23,7 @@ class BaseData:
         return dynaconf_core
 
     def __repr__(self):
-        return f"{self.__class__.__name__}({self.__dict__})"
+        return f"{self.__class__.__name__}({self})"
 
 
 class DataDict(dict, BaseData):
@@ -48,6 +48,9 @@ class DataDict(dict, BaseData):
             core.direct_ingest("__setattr__", path=(k,), value=v)
 
     def __repr__(self):
+        return f"{self.__class__.__name__}({dict(self)!r})"
+
+    def __prettyprint__(self):
         core_id = getattr(self.__get_dynaconf__(raises=False), "id", None)
         return f"{self.__class__.__name__}(core_id={core_id!r}, {dict(self)!r})"
 
@@ -77,6 +80,9 @@ class DataList(list, BaseData):
 
     def __iadd__(self, v):
         return super().__iadd__(ensure_containers(v))
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}({list(self)!r})"
 
 
 def convert_containers(data, iter):
