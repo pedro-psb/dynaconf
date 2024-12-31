@@ -187,6 +187,13 @@ class DynaconfCore:
         """Get preload request from namespace's pending_loaded."""
         return []
 
+    def direct_ingest(self, uri: str, path: tuple[str], value):
+        # TODO: add support for LoadRequest to take a path argument
+        key = path[-1]
+        load_request = LoadRequest("builtin.direct", uri, direct_data={key: value})
+        self.enqueue(load_request=load_request)
+        self.process_api(load=all, merge=all)
+
     @contextmanager
     def status_context(self, status: CoreStatus):
         original = self.status
@@ -195,6 +202,9 @@ class DynaconfCore:
             yield
         finally:
             self.status = original
+
+    def is_merging(self) -> bool:
+        return self.status == self.STATUS_SET.MERGING
 
     def _load(self, namespace_filter=None):
         """Load one pending requests and add to namespaces."""

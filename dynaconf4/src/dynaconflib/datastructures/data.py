@@ -41,32 +41,15 @@ class DataDict(dict, BaseData):
         return super().setdefault(k, ensure_containers(v))
 
     def __setitem__(self, k, v):
-        v = ensure_containers(v)
-
-        # If dynaconf is not initizalied, it behaves as a normal dict
-        if not (core := self.__get_dynaconf__(raises=False)):
-            super().__setitem__(k, v)
-            return
-
-        # Internal vs User __setattr__ calls:
-        # * Set calls from user must pass through the ingestion pipeline
-        # * Set calls from core (internal) are set normally
-        called_from_core = core.status == core.STATUS_SET.MERGING
-        called_from_user = not called_from_core
-        if called_from_core:
-            super().__setitem__(k, v)
-        elif called_from_user:
-            load_request = LoadRequest(
-                "builtin.direct", "__setattr__", direct_data={k: v}
-            )
-            core.enqueue(load_request=load_request)
-            core.process_api(load=all, merge=all)
+        initialized = core = self.__get_dynaconf__(raises=False)
+        if not initialized or core.is_merging():
+            super().__setitem__(k, ensure_containers(v))
+        else:  # caled from user
+            core.direct_ingest("__setattr__", path=(k,), value=v)
 
     def __repr__(self):
-        instance_id = None
-        if core := self.__get_dynaconf__(raises=False):
-            instance_id = core.id
-        return f"{self.__class__.__name__}(id={id(self)%1000}, core={instance_id!r}, {dict(self)!r})"
+        core_id = getattr(self.__get_dynaconf__(raises=False), "id", None)
+        return f"{self.__class__.__name__}(core_id={core_id!r}, {dict(self)!r})"
 
 
 class DataList(list, BaseData):
