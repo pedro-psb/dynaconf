@@ -6,7 +6,6 @@ from typing import Any, NamedTuple, TYPE_CHECKING
 from dynaconflib.utils import type_guard, container_items
 
 if TYPE_CHECKING:
-    from dynaconflib.core import DynaconfCore
     from dynaconflib.registry import PatchOpRegistry
 
 

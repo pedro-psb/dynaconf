@@ -100,7 +100,13 @@ from dynaconflib.datastructures import (
     PriorityField,
 )
 from dynaconflib.registry import RegistrySet
-from dynaconflib.utils import type_guard, raise_if, setup_limit, xor
+from dynaconflib.utils import (
+    type_guard,
+    raise_if,
+    setup_limit,
+    data_print,
+    container_items,
+)
 from typing import Optional
 from dynaconflib.exceptions import UnknownNamespace
 from enum import Enum, auto
@@ -128,12 +134,12 @@ class DynaconfCore:
     def __init__(self, id: str, schema: Optional[SchemaTree] = None):
         # common
         self.id = id
+        self.status = self.STATUS_SET.WAITING
         self.schema = schema or SchemaTree()
         self.registries = RegistrySet().setup_builtin()
         patch_registry = self.registries.patch_operations
         self.patch_engine = PatchEngine(patch_registry, self.schema)
-        self.namespaces = NamespaceSet(self.registries, self.patch_engine)
-        self.status = self.STATUS_SET.WAITING
+        self.namespaces = NamespaceSet(self.registries, self.patch_engine, self)
         # load
         self.load_context = LoadContext(
             schema_tree=self.schema, schema_strict=self.schema.strict
@@ -241,14 +247,19 @@ class DynaconfCore:
             print(f"{s*2}{ns.patch_q=}")
             print(f"{s*2}{ns.patch_lazy_q=}")
 
+    def __repr__(self):
+        return f"{self.__class__.__name__}({self.id=}, {self.status})"
+
 
 class NamespaceState:
-    def __init__(self, name, registry_set: RegistrySet, patch_engine: PatchEngine):
+    def __init__(
+        self, name, registry_set: RegistrySet, patch_engine: PatchEngine, data: DataDict
+    ):
         # common
         self.name = name
         self.registry_set = registry_set
         self.patch_engine = patch_engine
-        self.data = DataDict()
+        self.data = data
         # pending queues
         self.loaded_q = PriorityQueue[ProcUnit]()
         self.patch_q = PriorityQueue[ProcUnit]()
@@ -306,17 +317,22 @@ class NamespaceState:
 
 
 class NamespaceSet:
-    def __init__(self, registries: RegistrySet, patch_engine: PatchEngine):
+    def __init__(
+        self, registries: RegistrySet, patch_engine: PatchEngine, core: DynaconfCore
+    ):
         self._current = "default"
+        self.core = core
         self.patch_engine = patch_engine
         self.registries = registries
         self.namespaces: dict[str, NamespaceState] = {}
+
         # initial namespaces
         # TODO: consider using 'main' when namespaces are disabled, so
         # it we always have at least: ns-main + ns-default (fallback)
         # For now its not being used and default is also the main.
         self.create("default")
         self.create("main")
+
         # special namespaces
         # * _internal: Used for dynaconf dynamic internal settings
         # * _front-end: A reference to the user-facing settings object
@@ -328,13 +344,37 @@ class NamespaceSet:
         front_ns = self.get("_frontend")
         front_ns.data.clear()
         current_ns = self.get_current()
+
+        # Ensure data dict metadata is consistent
+        # Note:
+        #     This could be done in the patching system, but it is already
+        #     complex enough on its own. If perf impact is too bad, we should
+        #     reconsider
+        def walk(data, path):
+            for k, v in container_items(data):
+                new_path = path + (k,)
+                if isinstance(v, (dict, list)):
+                    v.__init_dynaconf__(self.core)
+                    v.__node_metadata__["path"] = new_path
+                    v.__node_metadata__["namespace"] = current_ns.name
+                    walk(v, new_path)
+
+        walk(current_ns.data, tuple())
+
+        # shallow copy root level k,v
         for k, v in current_ns.data.items():
             front_ns.data[k] = v
 
     def create(self, name: str):
         if name in self.namespaces:
             raise KeyError("Namespace already exist.")
-        self.namespaces[name] = NamespaceState(name, self.registries, self.patch_engine)
+        data = DataDict()
+        data.__init_dynaconf__(self.core)
+        data.__node_metadata__["namespace"] = name
+        data.__node_metadata__["path"] = tuple()
+        self.namespaces[name] = NamespaceState(
+            name, self.registries, self.patch_engine, data
+        )
 
     def get_current(self) -> NamespaceState:
         return self.get(self._current)

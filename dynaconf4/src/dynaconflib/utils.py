@@ -38,9 +38,10 @@ def data_print(data: DataDict | DataList, format="json", debug=False):
             children = [
                 v.to_compact_data() for v in self.children if isinstance(v, Node)
             ]
+            metadata = {k: repr(v) for k, v in self.metadata.items()}
             data = {
                 "compact_id": f"{self.key!r}, {self.key.__class__.__name__}, {self.value_type}",
-                "metadata": self.metadata,
+                "metadata": metadata,
                 "children": children,
             }
             return data

@@ -21,7 +21,12 @@ class DataDict(dict, BaseData):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # dont know why I cant move metadata init to the BaseData init
-        self.__node_metadata__ = {"path": None, "core": None}
+        self.__node_metadata__ = {
+            "path": None,
+            "core": None,
+            "id": id(self) % 100,
+            "namespace": None,
+        }
         convert_containers(self, self.items())
 
     def update(self, data):
