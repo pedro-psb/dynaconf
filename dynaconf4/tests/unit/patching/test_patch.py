@@ -161,6 +161,7 @@ def test_patch_apply(scenario: Scenario, registries):
         for k, v in container_items(container):
             if isinstance(v, (dict, list)):
                 walk(v)
+
     walk(base)
 
 

@@ -29,14 +29,20 @@ class BaseData:
 class DataDict(dict, BaseData):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # ensure all containres are DataDict/Lists
-        for key, value in self.items():
-            if isinstance(value, dict):
-                self[key] = DataDict(value)
-            elif isinstance(value, list):
-                self[key] = DataList(value)
+        convert_containers(self, self.items())
+
+    def update(self, data):
+        super().update(ensure_containers(data))
+
+    def copy(self):
+        return self.__class__(super().copy())
+
+    def setdefault(self, k, v):
+        return super().setdefault(k, ensure_containers(v))
 
     def __setitem__(self, k, v):
+        v = ensure_containers(v)
+
         # If dynaconf is not initizalied, it behaves as a normal dict
         if not (core := self.__get_dynaconf__(raises=False)):
             super().__setitem__(k, v)
@@ -66,12 +72,44 @@ class DataDict(dict, BaseData):
 class DataList(list, BaseData):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # ensure all containres are DataDict/Lists
-        for key, value in enumerate(self):
-            if isinstance(value, dict):
-                self[key] = DataDict(value)
-            elif isinstance(value, list):
-                self[key] = DataList(value)
+        convert_containers(self, enumerate(self))
+
+    def copy(self):
+        return self.__class__(super().copy())
+
+    def append(self, v):
+        super().append(ensure_containers(v))
+
+    def insert(self, i, v):
+        super().insert(i, ensure_containers(v))
+
+    def extend(self, data):
+        super().extend(ensure_containers(data))
+
+    def __setitem__(self, k, v):
+        super().__setitem__(k, ensure_containers(v))
+
+    def __add__(self, v):
+        super().__add__(ensure_containers(v))
+
+    def __iadd__(self, v):
+        return super().__iadd__(ensure_containers(v))
+
+
+def convert_containers(data, iter):
+    for key, value in iter:
+        if isinstance(value, dict):
+            data[key] = DataDict(value)
+        elif isinstance(value, list):
+            data[key] = DataList(value)
+
+
+def ensure_containers(data):
+    if data.__class__ is dict:
+        return DataDict(data)
+    elif data.__class__ is list:
+        return DataList(data)
+    return data
 
 
 def metadata_get(obj: BaseData, k: str):
@@ -82,19 +120,3 @@ def metadata_get(obj: BaseData, k: str):
 def metadata_set(obj: BaseData, k: str, v):
     node_metadata = getattr(obj, "__node_metadata__")
     node_metadata[k] = v
-
-
-def test_dynaconf_data_dict():
-    import pytest
-    from dynaconflib.core import DynaconfCore
-    from dynaconflib.datastructures import SchemaTree
-
-    data = DataDict()
-    print(data)
-
-    with pytest.raises(DynaconfNotInitialized, match="not initialized"):
-        data.__get_dynaconf__()
-
-    core = DynaconfCore("test", SchemaTree())
-    data.__init_dynaconf__(core)
-    assert core == data.__get_dynaconf__()
