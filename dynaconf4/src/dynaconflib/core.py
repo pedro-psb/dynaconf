@@ -125,17 +125,18 @@ class CoreStatus(Enum):
 class DynaconfCore:
     STATUS_SET = CoreStatus
 
-    def __init__(self, id: str, schema: SchemaTree):
+    def __init__(self, id: str, schema: Optional[SchemaTree] = None):
         # common
         self.id = id
-        self.schema = schema
+        self.schema = schema or SchemaTree()
         self.registries = RegistrySet().setup_builtin()
-        self.patch_engine = PatchEngine(self.registries.patch_operations, self.schema)
+        patch_registry = self.registries.patch_operations
+        self.patch_engine = PatchEngine(patch_registry, self.schema)
         self.namespaces = NamespaceSet(self.registries, self.patch_engine)
         self.status = self.STATUS_SET.WAITING
         # load
         self.load_context = LoadContext(
-            schema_tree=self.schema, schema_strict=schema.strict
+            schema_tree=self.schema, schema_strict=self.schema.strict
         )
         self.load_request_q = PriorityQueue[LoadRequest]()
 

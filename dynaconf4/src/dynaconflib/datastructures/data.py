@@ -7,10 +7,11 @@ if TYPE_CHECKING:
     from dynaconflib.core import DynaconfCore
 
 
-class BaseDynaconfData:
+class BaseData:
     def __init__(self, *args, **kwargs):
-        self.__dynaconf_core__ = None
         super().__init__(*args, **kwargs)
+        self.__node_metadata__ = {"path": None}
+        self.__convert_nested__()
 
     def __init_dynaconf__(self, dynaconf_core: DynaconfCore):
         self.__dynaconf_core__ = dynaconf_core
@@ -25,20 +26,20 @@ class BaseDynaconfData:
         return f"{self.__class__.__name__}({self.__dict__})"
 
 
-class DataDict(dict, BaseDynaconfData):
+class DataDict(dict, BaseData):
     def __init__(self, *args, **kwargs):
-        # * TODO: to ensure that, all nested dict/list should be DataDict and DataList
-        # setmode = metadata_get(self, "internal_setmode")
-        self.__node_metadata__ = {"path": None}
         super().__init__(*args, **kwargs)
+        # ensure all containres are DataDict/Lists
+        for key, value in self.items():
+            if isinstance(value, dict):
+                self[key] = DataDict(value)
+            elif isinstance(value, list):
+                self[key] = DataList(value)
 
     def __setitem__(self, k, v):
         # If dynaconf is not initizalied, it behaves as a normal dict
-        try:
-            core = self.__get_dynaconf__()
-        except DynaconfNotInitialized:
-            key = getattr(k, "key", k)
-            super().__setitem__(key, v)
+        if not (core := self.__get_dynaconf__(raises=False)):
+            super().__setitem__(k, v)
             return
 
         # Internal vs User __setattr__ calls:
@@ -59,20 +60,28 @@ class DataDict(dict, BaseDynaconfData):
         instance_id = None
         if core := self.__get_dynaconf__(raises=False):
             instance_id = core.id
-        return f"{self.__class__.__name__}(id={instance_id!r}, {dict(self)!r})"
+        return f"{self.__class__.__name__}(id={id(self)%1000}, core={instance_id!r}, {dict(self)!r})"
 
 
-def metadata_get(obj: BaseDynaconfData, k: str):
+class DataList(list, BaseData):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # ensure all containres are DataDict/Lists
+        for key, value in enumerate(self):
+            if isinstance(value, dict):
+                self[key] = DataDict(value)
+            elif isinstance(value, list):
+                self[key] = DataList(value)
+
+
+def metadata_get(obj: BaseData, k: str):
     metadata = getattr(obj, "__node_metadata__")
     return metadata[k]
 
 
-def metadata_set(obj: BaseDynaconfData, k: str, v):
+def metadata_set(obj: BaseData, k: str, v):
     node_metadata = getattr(obj, "__node_metadata__")
     node_metadata[k] = v
-
-
-class DataList(list, BaseDynaconfData): ...
 
 
 def test_dynaconf_data_dict():

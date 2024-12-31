@@ -5,6 +5,15 @@ def xor(a, b) -> bool:
     return a and b or not (a or b)
 
 
+def container_items(container: dict | list):
+    if isinstance(container, dict):
+        return container.items()
+    elif isinstance(container, list):
+        return enumerate(container)
+    else:
+        raise TypeError(f"Unsupported container type: {type(container)}")
+
+
 def setup_limit(limit):
     """Use positive int or infinity limit."""
     limit = limit or 0

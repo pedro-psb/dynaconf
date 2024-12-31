@@ -1,4 +1,12 @@
-from dynaconflib.datastructures import Patch, DataDict, PatchEngine, SchemaTree
+from dynaconflib.datastructures import (
+    Patch,
+    DataDict,
+    PatchEngine,
+    SchemaTree,
+    DataList,
+)
+from dynaconflib.utils import container_items
+from dynaconflib.core import DynaconfCore
 import pytest
 from dataclasses import dataclass, field
 from typing import Optional
@@ -140,13 +148,20 @@ def get_ids_patch(scenarios):
 
 @pytest.mark.parametrize("scenario", scenarios, ids=get_ids(scenarios))
 def test_patch_apply(scenario: Scenario, registries):
-    patch_registry = registries.patch_operations
-    schema = SchemaTree()
-    patch_engine = PatchEngine(patch_registry, schema)
+    core = DynaconfCore("patchtest")
+    patch_engine = core.patch_engine
 
     base = scenario.base
     patch_engine.apply(base, scenario.patches)
     assert base == scenario.expected
+
+    # All subnodes should be DataDict|DataList
+    def walk(container: dict | list):
+        assert container.__class__ in (DataDict, DataList)
+        for k, v in container_items(container):
+            if isinstance(v, (dict, list)):
+                walk(v)
+    walk(base)
 
 
 @pytest.mark.parametrize(
