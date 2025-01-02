@@ -1,6 +1,7 @@
 from dynaconflib.datastructures import LoadRequest, LoadContext, SchemaTree, Index
 from dataclasses import dataclass
 import pytest
+import os
 
 
 @dataclass
@@ -13,7 +14,7 @@ class Scenario:
     schema_items: list[tuple] = None
 
 
-scenarios = [
+direct = [
     Scenario(
         id="direct:no-root-envs",
         load_request=LoadRequest(
@@ -36,6 +37,8 @@ scenarios = [
         ),
         expected=[{"default": {"foo": "from-load-2"}, "prod": {"foo": "prod-bar"}}],
     ),
+]
+envvars = [
     Scenario(
         id="envvar:no-nesting",
         load_request=LoadRequest(
@@ -97,8 +100,67 @@ scenarios = [
     ),
 ]
 
+expected_file_data = {
+    "no-namespaces": {
+        "default": {
+            "database": {"host": "https://localhost", "port": 5432},
+            "user": {"name": "john"},
+        }
+    },
+    "with-namespaces": {
+        "default": {
+            "database": {"host": "https://default", "port": 1234},
+        },
+        "main": {
+            "database": {"host": "https://localhost", "port": 5432},
+        },
+    },
+}
 
-@pytest.mark.parametrize("scenario", scenarios)
+files = [
+    Scenario(
+        id="files:toml:no-namespace",
+        load_request=LoadRequest(
+            loader_id="builtin.toml",
+            uri=f"{os.getcwd()}/tests/unit/loaders/data/no-namespaces.toml",
+        ),
+        expected=[expected_file_data["no-namespaces"]],
+    ),
+    Scenario(
+        id="files:toml:with-namespace",
+        load_request=LoadRequest(
+            loader_id="builtin.toml",
+            uri=f"{os.getcwd()}/tests/unit/loaders/data/with-namespaces.toml",
+            namespace_in_root=True,
+        ),
+        expected=[expected_file_data["with-namespaces"]],
+    ),
+    Scenario(
+        id="files:toml:no-namespaces",
+        load_request=LoadRequest(
+            loader_id="builtin.json",
+            uri=f"{os.getcwd()}/tests/unit/loaders/data/no-namespaces.json",
+        ),
+        expected=[expected_file_data["no-namespaces"]],
+    ),
+    Scenario(
+        id="files:toml:with-namespaces",
+        load_request=LoadRequest(
+            loader_id="builtin.json",
+            uri=f"{os.getcwd()}/tests/unit/loaders/data/with-namespaces.json",
+            namespace_in_root=True,
+        ),
+        expected=[expected_file_data["with-namespaces"]],
+    ),
+]
+scenarios = direct + envvars + files
+
+
+def get_ids(scenarios):
+    return [f"LOAD-{i:02}:{x.id}" for i, x in enumerate(scenarios)]
+
+
+@pytest.mark.parametrize("scenario", scenarios, ids=get_ids(scenarios))
 def test_load(scenario: Scenario, monkeypatch, registries):
     load_registry = registries.loaders
     # setup schema

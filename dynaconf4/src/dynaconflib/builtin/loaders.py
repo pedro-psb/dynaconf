@@ -12,6 +12,8 @@ from dynaconflib.datastructures import (
 from dynaconflib.registry import LoaderRegistry
 from dynaconflib.utils import Empty, is_last, type_guard
 from dynaconflib.exceptions import LoadError
+import json
+import tomllib
 
 
 def setup_loaders(registry: LoaderRegistry):
@@ -108,11 +110,17 @@ class EnvLoader(BaseLoader):
 
 
 class TomlLoader(BaseLoader):
-    def load(self, load_request: LoadRequest, load_context: LoadContext): ...
+    def load(self, load_request: LoadRequest, load_context: LoadContext):
+        with open(load_request.uri, "rb") as fd:
+            content = tomllib.load(fd)
+        return LoadResult([content], load_request, load_context)
 
 
 class JsonLoader(BaseLoader):
-    def load(self, load_request: LoadRequest, load_context: LoadContext): ...
+    def load(self, load_request: LoadRequest, load_context: LoadContext):
+        with open(load_request.uri, "rb") as fd:
+            content = json.load(fd)
+        return LoadResult([content], load_request, load_context)
 
 
 class YamlLoader(BaseLoader):

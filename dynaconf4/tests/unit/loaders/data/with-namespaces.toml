@@ -1,0 +1,13 @@
+[default]
+
+  [default.database]
+  host="https://default"
+  port=1234
+
+[main]
+
+  [main.database]
+  host="https://localhost"
+  port=5432
+
+

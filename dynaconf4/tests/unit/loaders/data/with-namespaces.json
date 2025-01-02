@@ -1,0 +1,14 @@
+{
+  "default": {
+    "database": {
+      "host": "https://default",
+      "port": 1234
+    }
+  },
+  "main": {
+    "database": {
+      "host": "https://localhost",
+      "port": 5432
+    }
+  }
+}
