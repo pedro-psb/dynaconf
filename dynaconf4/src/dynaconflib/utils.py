@@ -2,6 +2,7 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING
 from dataclasses import dataclass, field
+from functools import partial
 
 if TYPE_CHECKING:
     from dynaconflib.datastructures import DataDict, DataList
@@ -72,6 +73,9 @@ def data_print(data: DataDict | DataList, format="json", debug=False):
     )
     # print(root)
     print(json.dumps(root.to_compact_data(), indent=4))
+
+
+data_debug = partial(data_print, debug=True)
 
 
 def container_items(container: dict | list):
