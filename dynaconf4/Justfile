@@ -1,25 +1,19 @@
 # https://just.systems/man/en/quick-start.html
-alias tc := coreutils-check
 
 # List commands
 default:
   @just --list --no-aliases
 
-# Display overview of coretuils
+docs:
+    mkdocs serve
+
 [group('test')]
-test-check NAME:
+test-unit:
+    -pytest --no-summary --no-header -k unit
+
+[group('test')]
+test-filter NAME:
     -pytest -v --no-summary --no-header -k {{NAME}}
-
-
-# Display overview of coretuils
-[group('test')]
-coreutils-check: (test-check 'coreutils')
-
-
-# Display overview of coretuils
-[group('test')]
-regenerate-functional:
-    python -m tests._tools.regenerate_functional
 
 [group('static-check')]
 format:
