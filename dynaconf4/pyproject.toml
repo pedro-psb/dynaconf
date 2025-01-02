@@ -22,7 +22,8 @@ license = {file = "LICENSE.txt"}
 # https://packaging.python.org/discussions/install-requires-vs-requirements/
 dependencies = [
   "rich",
-  "pluggy"
+  "pluggy",
+  "mkdocs-material"
 ]
 
 # Optional dependencies the project provides. These are commonly 

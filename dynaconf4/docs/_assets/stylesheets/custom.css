@@ -1,0 +1,8 @@
+/* Colors based on Furo (https://pradyunsg.me/furo/) */
+
+/* TODO: try to select only the first hiearchy level */
+.md-nav {
+  color: #3d94ff;
+  /* TODO: for light-mode: */
+  /* color: #0a4bff; */
+}

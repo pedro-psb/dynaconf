@@ -1,0 +1,156 @@
+site_name: Dynaconf - 4.0.0.dev0
+site_url: https://dynaconf.com
+site_description: Configuration Management for Python
+site_author: Bruno Rocha
+repo_name: dynaconf/dynaconf
+repo_url: https://github.com/dynaconf/dynaconf
+edit_uri: "https://github.com/dynaconf/dynaconf/tree/master/docs"
+nav:
+  - Welcome: index.md
+  - Usage:
+    - usage/getting-started.md
+    - Schema:
+      - usage/schema/introduction.md
+      - usage/schema/examples.md
+      - usage/schema/reference.md
+    - Loading:
+      - usage/loading/introduction.md
+      - usage/loading/examples.md
+      - usage/loading/reference.md
+    - Merging:
+      - usage/merging/introduction.md
+      - usage/merging/examples.md
+      - usage/merging/reference.md
+    - Evaluation:
+      - usage/evaluation/introduction.md
+      - usage/evaluation/examples.md
+      - usage/evaluation/reference.md
+    - Validation:
+      - usage/validation/introduction.md
+      - usage/validation/examples.md
+      - usage/validation/reference.md
+  - Integrations:
+    - Web Frameworks:
+      - usage/integrations/django.md
+      - usage/integrations/fastapi.md
+      - usage/integrations/flask.md
+    - Services:
+      - usage/integrations/redis.md
+      - usage/integrations/vault.md
+  - Development:
+    - CONTRIBUTING.md
+    - Architecture:
+      - dev/architecture/introduction.md
+      - Control:
+        - dev/architecture/core.md
+        - dev/architecture/namespaces.md
+      - Processing:
+        - dev/architecture/schema.md
+        - dev/architecture/load.md
+        - dev/architecture/evaluate.md
+        - dev/architecture/merge.md
+    - dev/debugging.md
+  - More:
+    - community.md
+    - CHANGELOG.md
+    - LICENSE.md
+
+theme:
+  features:
+    - search.suggest
+    - search.highlight
+    - search.share
+    - content.code.annotate
+    # ...
+    - navigation.indexes
+    - content.code.annotate
+    # - navigation.tabs
+    - navigation.sections
+    - navigation.path
+    - navigation.footer
+    - navigation.top
+    - toc.follow
+    - content.code.annotation
+    - content.code.copy
+    - content.action.edit
+  name: material
+  language: en
+  logo: _assets/img/logo_square_d.svg
+  favicon: _assets/img/favicon.ico
+  palette:
+    - scheme: default
+      media: "(prefers-color-scheme: light)"
+      primary: white
+      accent: teal
+      toggle:
+        icon: material/lightbulb-outline
+        name: Switch to dark mode
+    - scheme: slate
+      media: "(prefers-color-scheme: dark)"
+      primary: black
+      accent: teal
+      toggle:
+        icon: material/lightbulb
+        name: Switch to light mode
+
+markdown_extensions:
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.inlinehilite
+  - pymdownx.magiclink
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.superfences
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tilde
+  - pymdownx.snippets
+  - admonition
+  - codehilite:
+      guess_lang: false
+  - toc:
+      permalink: true
+plugins:
+  # - autorefs
+  # - git-revision-date
+  - search:
+      lang: en
+  # - mkdocstrings:
+  #     handlers:
+  #       python:
+  #         options:
+  #           show_symbol_type_heading: true
+  #           show_symbol_type_toc: true
+  #           show_root_toc_entry: true
+  #           show_object_full_path: true
+  #           filters: ["!^_"]
+  #           docstring_options:
+  #             ignore_init_summary: true
+  #           merge_init_into_class: true
+  #           docstring_section_style: table
+  #           summary: true
+extra:
+  disqus: dynaconf
+  social:
+    - icon: fontawesome/brands/github-alt
+      link: https://github.com/dynaconf/dynaconf
+    - icon: fontawesome/brands/twitter
+      link: https://twitter.com/rochacbruno
+    - icon: fontawesome/brands/linkedin
+      link: https://linkedin.com/in/rochacbruno
+    - icon: fontawesome/brands/twitch
+      link: https://twitch.tv/codeshow
+
+extra_css:
+  - _assets/stylesheets/mkdocstrings.css
+  - _assets/stylesheets/custom.css
+
+extra_javascript:
+  - _assets/javascripts/mathjax.js
+  - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
