@@ -142,16 +142,17 @@ class DynaconfCore:
         """Merge one item from ns.load_q into ns.main."""
         with self.status_context(self.STATUS_SET.MERGING):
             # create patch and move to patch_q
-            proc_unit = ns_state.process_loaded(ns_state.loaded_q.pop())
+            proc_unit = ns_state.loaded_q.pop().process_loaded()
             ns_state.patch_q.push(proc_unit)
 
             # apply patch and move to lazy_q
-            proc_unit = ns_state.process_patch(ns_state.patch_q.pop())
-            created_lazy_patches = bool(proc_unit.patches_lazy)
-            if created_lazy_patches:
+            proc_unit = ns_state.patch_q.pop().process_patch()
+            if proc_unit.has_lazy_patches():
                 ns_state.patch_lazy_q.push(proc_unit)
-            else:
+            elif proc_unit.is_done():
                 ns_state.done_q.push(proc_unit)
+            else:
+                raise RuntimeError("This should never happen.")
 
             # final ingestion state
             self.namespaces.reconcile()
@@ -160,7 +161,7 @@ class DynaconfCore:
         """Merge one lazy item from ns.load_lazy_q into ns.main."""
         with self.status_context(self.STATUS_SET.MERGING):
             # apply lazy and move to doneQ
-            proc_unit = ns_state.process_patches_lazy(ns_state.patch_lazy_q.pop())
+            proc_unit = ns_state.patch_lazy_q.pop().process_patches_lazy()
             ns_state.done_q.push(proc_unit)
 
             # final ingestion state
@@ -198,48 +199,14 @@ class NamespaceState:
         self.done_q = Queue[ProcUnit]()
 
     def push(self, *, loaded_parts: list[dict], load_request: LoadRequest):
-        self.loaded_q.push(
-            ProcUnit(loaded_parts, load_request, load_request.priority_field)
+        proc_unit = ProcUnit(
+            loaded_parts,
+            load_request,
+            self.patch_engine,
+            self.data,
+            priority_field=load_request.priority_field,
         )
-
-    def process_loaded(self, proc_unit: Optional[ProcUnit]) -> ProcUnit | None:
-        """Process one ProcUnit from loaded_q."""
-        if not proc_unit:
-            return
-
-        loaded_parts = proc_unit.loaded
-        all_patches = []
-        for load_part in loaded_parts:
-            all_patches.extend(self.patch_engine.create(load_part))
-        # update processing unit
-        patches_immediate = []
-        patches_lazy = []
-        for patch in all_patches:
-            if patch.lazy is False:
-                patches_immediate.append(patch)
-            else:
-                patches_lazy.append(patch)
-        proc_unit.update(patches=patches_immediate, patches_lazy=patches_lazy)
-        return proc_unit
-
-    def process_patch(self, proc_unit: Optional[ProcUnit]) -> ProcUnit | None:
-        """Process one ProcUnit from patch_q."""
-        if not proc_unit:
-            return
-
-        patches = proc_unit.patches
-        self.patch_engine.apply(self.data, patches)
-        proc_unit.patches.clear()
-        return proc_unit
-
-    def process_patches_lazy(self, proc_unit: Optional[ProcUnit]) -> ProcUnit | None:
-        """Process one ProcUnit from patch_lazy_q."""
-        if not proc_unit:
-            return
-
-        patches_lazy = proc_unit.patches_lazy
-        self.patch_engine.apply(self.data, patches_lazy)
-        return proc_unit
+        self.loaded_q.push(proc_unit)
 
     def validate(self): ...
 
@@ -356,13 +323,54 @@ class ProcUnit:
         self,
         loaded: list[dict],
         load_request: LoadRequest,
+        patch_engine: PatchEngine,
+        data: DataDict,
         priority_field: PriorityField = PriorityField(),
     ):
         self.load_request = load_request
+        self.priority_field = priority_field
+        self.patch_engine = patch_engine
+        self.data = data
+        # data
         self.loaded = loaded
         self.patches = []
         self.patches_lazy = []
-        self.priority_field = priority_field
+
+    def process_loaded(self):
+        """Process one ProcUnit from loaded_q."""
+        loaded_parts = self.loaded
+        all_patches = []
+        for load_part in loaded_parts:
+            all_patches.extend(self.patch_engine.create(load_part))
+        # update processing unit
+        patches_immediate = []
+        patches_lazy = []
+        for patch in all_patches:
+            if patch.lazy is False:
+                patches_immediate.append(patch)
+            else:
+                patches_lazy.append(patch)
+        self.update(patches=patches_immediate, patches_lazy=patches_lazy)
+        return self
+
+    def process_patch(self):
+        """Process one ProcUnit from patch_q."""
+        patches = self.patches
+        self.patch_engine.apply(self.data, patches)
+        self.patches.clear()
+        return self
+
+    def process_patches_lazy(self):
+        """Process one ProcUnit from patch_lazy_q."""
+        patches_lazy = self.patches_lazy
+        self.patch_engine.apply(self.data, patches_lazy)
+        return self
+
+    def is_done(self):
+        return self.loaded and self.patches and self.patches_lazy
+
+    def has_lazy_patches(self):
+        return bool(self.has_lazy_patches)
 
     def update(
         self,
@@ -374,9 +382,6 @@ class ProcUnit:
             self.patches = patches
         if patches_lazy:
             self.patches_lazy = patches_lazy
-
-    def is_done(self):
-        return self.loaded and self.patches and self.patches_lazy
 
     def clear(self):
         self.load_request = None
