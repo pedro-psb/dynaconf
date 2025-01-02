@@ -3,89 +3,7 @@ Main control module of dynaconf.
 
 DynaconfCore manages global states and control the data flow in NamespaceSet.
 
-
-## Overview Workflow
-
-This is an overview of the main data organization.
-(The names are not supposed to match the implementation)
-
-* Core:
-    * LoadRequestQ
-    * Namespaces:
-        * Namespace-0:
-            * LoadedQ
-            * PatchQ
-            * LazyPatchQ
-        * (...)
-        * Namespace-k:
-            * LoadedQ
-            * PatchQ
-            * LazyPatchQ
-
-
-## Load Workflow
-
-The core holds the LoadRequest Queue and is responsible for calling the
-correct loader and distributing the data into the correct namespaces (ns).
-It also holds several Registries for loaders, patch_operations, etc.
-
-                                         ----> (ns-0) LoadedQ
-                                        |         .
-(core) LoadRequestQ -- load_pending() --|         .
-                                        |         .
-                                         ----> (ns-n) LoadedQ
-
-## Merge Workflow
-
-Each namespace is represented by a NamespaceState, which holds queues
-for pending intermediary datastructures, like loaded data (but not merged),
-patches ready to be applied and lazy patches, that should be applied later.
-
-In this step, tokens, converteres and dynamic values are evaluated when
-possible or moved to the lazyQ.
-
-     namespace-k
-    +------------------------------------------------+
-    | base: DataDict                                 |
-    |                                                |
-    |    pending_loaded Q                            |
-    |          |                                     |
-    |          | create_patch(loaded) -> Patch       |
-    |          |                                     |
-    |    pending_patch Q                             |
-    |          |                                     |
-    |          | apply_patch(base, Patch) -> Patch   |
-    |          |                                     |
-    |  pending_patch_lazy Q                          |
-    |          |                                     |
-    |          | apply_lazy_patch(base, Patch)       |
-    |          x                                     |
-    +------------------------------------------------+
-
-
-## Default System
-
-The 'default' namespace (ns-default) always exist and it's content is the access-time
-fallback for when the activate namespace doesnt contain the requested key. The system
-is a simple implementation of a ChainMap using dynaconf internals.
-
-The ns-default content comes first from the schema declaration, then from loaded data.
-
-Example:
-
-    Given the namespace content:
-    * ns-default = {'a': 0, 'b': 0}
-    * ns-dev = {'a': 1}
-
-    Then:
-    ```python
-    >>> settings['a']  # active env has the key, use its value
-    1
-    >>> settings['b']  # activate env dont have the key, try ns-default
-    0
-    >>> settings['c']  # ns-default doesnt have it either
-    KeyError: ...
-    ```
+Learn more in [docs](dev/architecture/core.md)
 """
 
 from __future__ import annotations
@@ -97,6 +15,7 @@ from dynaconflib.datastructures import (
     SchemaTree,
     PatchEngine,
     PriorityQueue,
+    Queue,
     PriorityField,
 )
 from dynaconflib.registry import RegistrySet
@@ -104,7 +23,7 @@ from dynaconflib.utils import (
     setup_limit,
     container_items,
 )
-from typing import Optional
+from typing import Optional, Callable
 from dynaconflib.exceptions import UnknownNamespace
 from enum import Enum, auto
 from contextlib import contextmanager
@@ -157,7 +76,7 @@ class DynaconfCore:
         """Command API that control ingestion process.
 
         Params:
-            load: Load all or the specified number of processing-units.
+            load: Load all or the specified number of load requests.
             merge: Merge all or the specified number of processing-units.
             merge_lazy: Merge all or the specified number of lazy processing-units.
             namespaces: The namespaces that should be used in the process.
@@ -216,22 +135,36 @@ class DynaconfCore:
             loader = self.registries.loaders.get(load_request.loader_id)
             result = loader.load(load_request, self.load_context)
             for ns, data_parts in result.items():
-                self.namespaces.get(ns).enqueue(
-                    loaded_parts=data_parts, load_request=load_request
-                )
+                ns_state = self.namespaces.get(ns)
+                ns_state.push(loaded_parts=data_parts, load_request=load_request)
 
     def _merge(self, ns_state: NamespaceState):
         """Merge one item from ns.load_q into ns.main."""
         with self.status_context(self.STATUS_SET.MERGING):
-            ns_state.process_loaded()
-            ns_state.process_patch()
-            self.namespaces.update_frontend()
+            # create patch and move to patch_q
+            proc_unit = ns_state.process_loaded(ns_state.loaded_q.pop())
+            ns_state.patch_q.push(proc_unit)
+
+            # apply patch and move to lazy_q
+            proc_unit = ns_state.process_patch(ns_state.patch_q.pop())
+            created_lazy_patches = bool(proc_unit.patches_lazy)
+            if created_lazy_patches:
+                ns_state.patch_lazy_q.push(proc_unit)
+            else:
+                ns_state.done_q.push(proc_unit)
+
+            # final ingestion state
+            self.namespaces.reconcile()
 
     def _merge_lazy(self, ns_state: NamespaceState):
         """Merge one lazy item from ns.load_lazy_q into ns.main."""
         with self.status_context(self.STATUS_SET.MERGING):
-            ns_state.process_patches_lazy()
-            self.namespaces.update_frontend()
+            # apply lazy and move to doneQ
+            proc_unit = ns_state.process_patches_lazy(ns_state.patch_lazy_q.pop())
+            ns_state.done_q.push(proc_unit)
+
+            # final ingestion state
+            self.namespaces.reconcile()
 
     def debug(self):
         s = "    "
@@ -243,6 +176,7 @@ class DynaconfCore:
             print(f"{s*2}{ns.loaded_q=}")
             print(f"{s*2}{ns.patch_q=}")
             print(f"{s*2}{ns.patch_lazy_q=}")
+            print(f"{s*2}{ns.done_q=}")
 
     def __repr__(self):
         return f"{self.__class__.__name__}({self.id=}, {self.status})"
@@ -261,18 +195,18 @@ class NamespaceState:
         self.loaded_q = PriorityQueue[ProcUnit]()
         self.patch_q = PriorityQueue[ProcUnit]()
         self.patch_lazy_q = PriorityQueue[ProcUnit]()
+        self.done_q = Queue[ProcUnit]()
 
-    def enqueue(self, *, loaded_parts: list[dict], load_request: LoadRequest):
+    def push(self, *, loaded_parts: list[dict], load_request: LoadRequest):
         self.loaded_q.push(
             ProcUnit(loaded_parts, load_request, load_request.priority_field)
         )
 
-    def process_loaded(self):
+    def process_loaded(self, proc_unit: Optional[ProcUnit]) -> ProcUnit | None:
         """Process one ProcUnit from loaded_q."""
-        if self.loaded_q.is_empty():
+        if not proc_unit:
             return
-        # get and process
-        proc_unit = self.loaded_q.pop()
+
         loaded_parts = proc_unit.loaded
         all_patches = []
         for load_part in loaded_parts:
@@ -286,26 +220,26 @@ class NamespaceState:
             else:
                 patches_lazy.append(patch)
         proc_unit.update(patches=patches_immediate, patches_lazy=patches_lazy)
-        # update namespace queues
-        self.patch_q.push(proc_unit)
-        self.patch_lazy_q.push(proc_unit)
+        return proc_unit
 
-    def process_patch(self):
+    def process_patch(self, proc_unit: Optional[ProcUnit]) -> ProcUnit | None:
         """Process one ProcUnit from patch_q."""
-        if self.patch_q.is_empty():
+        if not proc_unit:
             return
-        proc_unit = self.patch_q.pop()
+
         patches = proc_unit.patches
         self.patch_engine.apply(self.data, patches)
         proc_unit.patches.clear()
+        return proc_unit
 
-    def process_patches_lazy(self):
+    def process_patches_lazy(self, proc_unit: Optional[ProcUnit]) -> ProcUnit | None:
         """Process one ProcUnit from patch_lazy_q."""
-        if self.patch_lazy_q.is_empty():
+        if not proc_unit:
             return
-        proc_unit = self.patch_lazy_q.pop()
+
         patches_lazy = proc_unit.patches_lazy
         self.patch_engine.apply(self.data, patches_lazy)
+        return proc_unit
 
     def validate(self): ...
 
@@ -336,13 +270,20 @@ class NamespaceSet:
         self.create("_internal")
         self.create("_frontend")
 
-    def update_frontend(self):
-        """Update the frontend namespace object with the active ns.data."""
-        front_ns = self.get("_frontend")
-        front_ns.data.clear()
-        current_ns = self.get_current()
+    def reconcile(self):
+        """Final step of the ingestion process. Must never be skipped.
 
-        # Ensure data dict metadata is consistent
+        * Update the frontend-ns data with active-ns data.
+        * Update metadata for every (modified) data-node.
+        """
+        current_ns = self.get_current()
+        front_ns = self.get("_frontend")
+        front_md = front_ns.data.__node_metadata__
+        front_ns.data.clear()
+        front_ns.data.__node_metadata__ = front_md
+        # front_ns.data.__node_metadata__["namespace"] = current_ns.name
+
+        # Update data-node metadata to reconcile changes
         # Note:
         #     This could be done in the patching system, but it is already
         #     complex enough on its own. If perf impact is too bad, we should
@@ -358,7 +299,7 @@ class NamespaceSet:
 
         walk(current_ns.data, tuple())
 
-        # shallow copy root level k,v
+        # Update frontend with shallow copy
         for k, v in current_ns.data.items():
             front_ns.data[k] = v
 

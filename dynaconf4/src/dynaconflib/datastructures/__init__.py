@@ -3,7 +3,7 @@ from .load import BaseLoader, LoadRequest, LoadContext, LoadResult, LoadDeclarat
 from .patch import Patch, PatchEngine, BasePatchOperation
 from .token import DynaconfToken, TokenCallback
 from .validate import Validator
-from .standard import Tree, TreePath, PriorityQueue, PriorityField
+from .standard import Tree, TreePath, PriorityQueue, PriorityField, Queue
 from .schema import SchemaTree, SchemaNode, Index
 
 __all__ = [
@@ -26,6 +26,7 @@ __all__ = [
     # standard datastructures
     "TreePath",
     "Tree",
+    "Queue",
     "PriorityQueue",
     "PriorityField",
 ]

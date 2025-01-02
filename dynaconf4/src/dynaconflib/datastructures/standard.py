@@ -33,12 +33,15 @@ class Stack(LinearDataStructure[T]):
         self._data.reverse()
 
 
-class Queue(LinearDataStructure):
-    def dequeue(self):
-        return self._data.pop(0)
-
-    def enqueue(self, item):
+class Queue(LinearDataStructure[T]):
+    def push(self, item) -> T | None:
         self._data.insert(0, item)
+
+    def pop(self):
+        try:
+            return self._data.pop(0)
+        except IndexError:
+            return None
 
 
 class PriorityGroup(IntEnum):

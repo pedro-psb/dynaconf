@@ -64,6 +64,8 @@ def test_core_workflow():
     core.process_api(merge=all)
     assert default_namespace.data == {"a": {"x": 1, "y": False}}
 
+    core.debug()
+
     # TODO: evalute
     core.process_api(merge_lazy=all)
 
