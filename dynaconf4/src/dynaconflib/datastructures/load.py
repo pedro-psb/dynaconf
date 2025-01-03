@@ -26,6 +26,9 @@ class LoadRequest(NamedTuple):
     namespace_filter: Optional[list] = None
     direct_data: Optional[dict] = None
 
+    def id_string(self):
+        return f"{self.loader_id}:{self.uri}"
+
 
 class LoadContext(NamedTuple):
     namespace_default: str = "default"

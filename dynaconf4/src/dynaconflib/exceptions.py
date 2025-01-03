@@ -1,6 +1,9 @@
 class LoadError(BaseException): ...
 
 
+class MergeError(BaseException): ...
+
+
 class SchemaError(BaseException): ...
 
 

@@ -3,6 +3,10 @@ from __future__ import annotations
 from typing import TypeVar
 from .datastructures import LoadRequest, DataDict, SchemaTree, LoadDeclaration
 from .core import DynaconfCore
+from dynaconflib.public import FileLoader
+from dynaconflib.utils import ensure_list
+
+# from dynaconflib.public import LegacyParser
 from contextlib import contextmanager
 
 T = TypeVar("T")
@@ -28,8 +32,8 @@ class BaseSchema(DataDict):
 def Dynaconf(schema: type[T] = BaseSchema, *args, **kwargs) -> T:
     # parse init arguments
     instance_id = kwargs.get("name", "dynaconf")
-    load_declaration_list: list[LoadDeclaration] = kwargs.get("load", [])
     data = kwargs.get("data", {})
+    setting_files = ensure_list(kwargs.get("setting_files", []))
 
     # initialize main data instance and dynaconf core
     schema_tree = SchemaTree.from_cls(schema)
@@ -44,13 +48,11 @@ def Dynaconf(schema: type[T] = BaseSchema, *args, **kwargs) -> T:
 
     # load workflow
     load_request_direct = LoadRequest("builtin.direct", "init", direct_data=data)
+    load_request_files = FileLoader(setting_files).build() if setting_files else []
     load_request_environ = LoadRequest("builtin.environ", "init")
-
-    dynaconf_core.enqueue(load_request=load_request_direct)
-    for load_declaration in load_declaration_list:
-        for load_request in load_declaration:
-            dynaconf_core.enqueue(load_request=load_request)
-    dynaconf_core.enqueue(load_request=load_request_environ)
+    load_request_list = [load_request_direct, *load_request_files, load_request_environ]
+    for load_request in load_request_list:
+        dynaconf_core.enqueue(load_request=load_request)
     dynaconf_core.process_api(load=all)
 
     # preload_request are discovered dynamically and should be merged first

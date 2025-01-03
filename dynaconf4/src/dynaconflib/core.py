@@ -22,6 +22,7 @@ from dynaconflib.registry import RegistrySet
 from dynaconflib.utils import (
     setup_limit,
     container_items,
+    type_guard,
 )
 from typing import Optional, Callable
 from dynaconflib.exceptions import UnknownNamespace
@@ -64,6 +65,7 @@ class DynaconfCore:
 
     def enqueue(self, *, load_request: LoadRequest):
         """Enqueue load_request into load_request_q."""
+        type_guard(load_request, LoadRequest)
         self.load_request_q.push(load_request)
 
     def process_api(
@@ -339,7 +341,7 @@ class ProcUnit:
         loaded_parts = self.loaded
         all_patches = []
         for load_part in loaded_parts:
-            all_patches.extend(self.patch_engine.create(load_part))
+            all_patches.extend(self.patch_engine.create(load_part, self.load_request))
         # update processing unit
         patches_immediate = []
         patches_lazy = []

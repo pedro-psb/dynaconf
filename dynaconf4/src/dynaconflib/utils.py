@@ -24,6 +24,10 @@ def xor(a, b) -> bool:
     return a and b or not (a or b)
 
 
+def ensure_list(o: list[str | str]) -> list:
+    return o if isinstance(o, list) else [o]
+
+
 def data_print(data: DataDict | DataList, format="json", debug=False):
     """Data print utilities.
 

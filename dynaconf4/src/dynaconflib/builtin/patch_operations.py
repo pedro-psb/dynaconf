@@ -1,5 +1,6 @@
 from dynaconflib.datastructures import BasePatchOperation
 from dynaconflib.registry import PatchOpRegistry
+from dynaconflib.exceptions import MergeError
 
 
 def setup_patch_operations(registry: PatchOpRegistry):
@@ -23,7 +24,10 @@ class Replace(BasePatchOperation):
         data[key] = value
 
     def on_list(self, data: list, key, value):
-        data[key] = value
+        try:
+            data[key] = value
+        except IndexError:
+            raise MergeError(f"Index out for range: can't replace at index={key} on {data=}.")
 
 
 class Append(BasePatchOperation):

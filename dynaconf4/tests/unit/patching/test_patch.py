@@ -1,15 +1,23 @@
 from dynaconflib.datastructures import (
-    Patch,
+    Patch as _Patch,
     DataDict,
     PatchEngine,
     SchemaTree,
     DataList,
+    LoadRequest,
 )
 from dynaconflib.utils import container_items
 from dynaconflib.core import DynaconfCore
 import pytest
 from dataclasses import dataclass, field
 from typing import Optional
+from functools import partial
+
+
+# load request is passed for inspecting purpose.
+# for all this test we only need a dummy one
+dummy_load_request = LoadRequest("dummy", "test")
+Patch = partial(_Patch, load_request=dummy_load_request)
 
 
 @dataclass
@@ -173,5 +181,5 @@ def test_patch_create(scenario: Scenario, registries):
     schema = SchemaTree()
     patch_engine = PatchEngine(patch_registry, schema)
 
-    result = patch_engine.create(scenario.patch_origin)
+    result = patch_engine.create(scenario.patch_origin, dummy_load_request)
     assert result == scenario.patches
