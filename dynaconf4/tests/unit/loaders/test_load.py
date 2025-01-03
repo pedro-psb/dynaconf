@@ -4,6 +4,10 @@ import pytest
 import os
 
 
+def get_file_fixture_path(filename: str):
+    return f"{os.getcwd()}/tests/unit/loaders/data/{filename}"
+
+
 @dataclass
 class Scenario:
     id: str
@@ -38,7 +42,7 @@ direct = [
         expected=[{"default": {"foo": "from-load-2"}, "prod": {"foo": "prod-bar"}}],
     ),
 ]
-envvars = [
+envvars_schema = [
     Scenario(
         id="envvar:no-nesting",
         load_request=LoadRequest(
@@ -96,11 +100,31 @@ envvars = [
             (["mylist", Index()], int),
         ],
         expected=[{"default": {"mylist": ["123"]}}],
-        # load_context=LoadContext(schema_tree=mock_schema_tree(path_types=[(("mylist",), list)]))
     ),
 ]
 
-expected_file_data = {
+envvars_noschema = [
+    Scenario(
+        id="noschema:envvar:no-nesting",
+        load_request=LoadRequest(
+            loader_id="builtin.environ",
+            uri="unit_test",
+        ),
+        envvar_data={"DYNACONF_MYKEY": "123"},
+        expected=[{"default": {"mykey": "123"}}],
+    ),
+    Scenario(
+        id="noschema:envvar:no-nesting",
+        load_request=LoadRequest(
+            loader_id="builtin.environ",
+            uri="unit_test",
+        ),
+        envvar_data={"DYNACONF_MYKEY__0": "123"},
+        expected=[{"default": {"mykey": ["123"]}}],
+    ),
+]
+
+expected_for_files = {
     "no-namespaces": {
         "default": {
             "database": {"host": "https://localhost", "port": 5432},
@@ -124,7 +148,7 @@ files = [
             loader_id="builtin.toml",
             uri=f"{os.getcwd()}/tests/unit/loaders/data/no-namespaces.toml",
         ),
-        expected=[expected_file_data["no-namespaces"]],
+        expected=[expected_for_files["no-namespaces"]],
     ),
     Scenario(
         id="files:toml:with-namespace",
@@ -133,7 +157,7 @@ files = [
             uri=f"{os.getcwd()}/tests/unit/loaders/data/with-namespaces.toml",
             namespace_in_root=True,
         ),
-        expected=[expected_file_data["with-namespaces"]],
+        expected=[expected_for_files["with-namespaces"]],
     ),
     Scenario(
         id="files:toml:no-namespaces",
@@ -141,19 +165,19 @@ files = [
             loader_id="builtin.json",
             uri=f"{os.getcwd()}/tests/unit/loaders/data/no-namespaces.json",
         ),
-        expected=[expected_file_data["no-namespaces"]],
+        expected=[expected_for_files["no-namespaces"]],
     ),
     Scenario(
         id="files:toml:with-namespaces",
         load_request=LoadRequest(
             loader_id="builtin.json",
-            uri=f"{os.getcwd()}/tests/unit/loaders/data/with-namespaces.json",
+            uri=get_file_fixture_path("with-namespaces.json"),
             namespace_in_root=True,
         ),
-        expected=[expected_file_data["with-namespaces"]],
+        expected=[expected_for_files["with-namespaces"]],
     ),
 ]
-scenarios = direct + envvars + files
+scenarios = direct + envvars_noschema + envvars_schema + files
 
 
 def get_ids(scenarios):
@@ -164,7 +188,8 @@ def get_ids(scenarios):
 def test_load(scenario: Scenario, monkeypatch, registries):
     load_registry = registries.loaders
     # setup schema
-    schema = SchemaTree(strict=True)
+    schema_strict = bool(scenario.schema_items)
+    schema = SchemaTree(strict=schema_strict)
     schema_items = scenario.schema_items or []
     for path, t in schema_items:
         schema.add(path, t)

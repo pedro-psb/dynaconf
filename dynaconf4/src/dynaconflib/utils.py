@@ -3,10 +3,21 @@ import json
 from typing import TYPE_CHECKING
 from dataclasses import dataclass, field
 from functools import partial
+from enum import Enum
 
 if TYPE_CHECKING:
     from dynaconflib.datastructures import DataDict, DataList
-Empty = object()
+
+
+class SENTINEL(Enum):
+    """Enum for sentinel/singleton values
+    Recommended here: https://stackoverflow.com/a/76606310
+    """
+
+    empty = 0
+
+
+Empty = SENTINEL.empty
 
 
 def xor(a, b) -> bool:

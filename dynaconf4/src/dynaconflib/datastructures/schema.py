@@ -3,7 +3,7 @@ from typing import NamedTuple
 
 
 class SchemaNode(NamedTuple):
-    key: str | int
+    key: str | int | Index
     key_type: type
     value_type: type
     children_key_type: type
@@ -11,9 +11,7 @@ class SchemaNode(NamedTuple):
     def __eq__(self, o):
         return all([getattr(o, f) == getattr(self, f) for f in self._fields])
 
-
-class Index(NamedTuple):
-    value: int = 0
+class Index(int):
 
     def __eq__(self, o):
         return type(self) is type(o)

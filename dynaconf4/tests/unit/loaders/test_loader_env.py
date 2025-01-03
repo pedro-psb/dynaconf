@@ -19,7 +19,7 @@ def test_schema_get_path():
     ]
     result = schema.get_path(from_raw=path)
     assert result == expected
-    assert result[1].key.value == expected[1].key.value
+    assert int(result[1].key) == int(expected[1].key)
 
 
 def test_envloader_simple():

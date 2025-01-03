@@ -82,7 +82,7 @@ class EnvLoader(BaseLoader):
     @staticmethod
     def schema_path_to_data(schema_path: list[SchemaNode], value) -> dict:
         """
-        Transform a path in the form (schema_path: value) to its expanded pyhton data.
+        Transform (schema_path, value) pair to its expanded pyhton data.
 
         Example:
             path_to_data([SchemaNode("a", ...), SchemaNode("b", ...)], value) -> {"a": {"b": value}}
@@ -91,15 +91,15 @@ class EnvLoader(BaseLoader):
         parent_v = {}
         final_data = parent_v
 
-        for i, current_schema in enumerate(schema_path):
-            current_type = current_schema.value_type
-            current_k = current_schema.key
+        for i, current_node in enumerate(schema_path):
+            current_type = current_node.value_type
+            current_k = current_node.key
             current_v = (
                 current_type() if not is_last(schema_path, i) else terminal_value
             )
             # fill parent_v to sufficient length if a list
             if isinstance(parent_v, list):
-                current_k = current_k.value
+                current_k = int(current_k)  # converts Index to int
                 for i in range(current_k + 1):
                     parent_v.append(Empty)
             # add to parent (works for dict and lists)
