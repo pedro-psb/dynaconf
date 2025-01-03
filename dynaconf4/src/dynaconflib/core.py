@@ -149,10 +149,8 @@ class DynaconfCore:
             proc_unit = ns_state.patch_q.pop().process_patch()
             if proc_unit.has_lazy_patches():
                 ns_state.patch_lazy_q.push(proc_unit)
-            elif proc_unit.is_done():
-                ns_state.done_q.push(proc_unit)
             else:
-                raise RuntimeError("This should never happen.")
+                ns_state.done_q.push(proc_unit)
 
             # final ingestion state
             self.namespaces.reconcile()
@@ -357,7 +355,7 @@ class ProcUnit:
         """Process one ProcUnit from patch_q."""
         patches = self.patches
         self.patch_engine.apply(self.data, patches)
-        self.patches.clear()
+        # self.patches.clear()
         return self
 
     def process_patches_lazy(self):
@@ -370,7 +368,7 @@ class ProcUnit:
         return self.loaded and self.patches and self.patches_lazy
 
     def has_lazy_patches(self):
-        return bool(self.has_lazy_patches)
+        return bool(self.patches_lazy)
 
     def update(
         self,
@@ -390,4 +388,5 @@ class ProcUnit:
         self.patches_lazy.clear()
 
     def __repr__(self):
-        return f"{self.__class__.__name__}(uri={self.load_request.uri!r}, {self.loaded=}, {self.patches=}, {self.patches_lazy=})"
+        origin_str = f"{self.load_request.loader_id}:{self.load_request.uri}"
+        return f"{self.__class__.__name__}(origin={origin_str!r}, {self.loaded=}, {self.patches=}, {self.patches_lazy=})"
