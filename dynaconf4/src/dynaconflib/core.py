@@ -208,6 +208,10 @@ class NamespaceState:
         )
         self.loaded_q.push(proc_unit)
 
+    def get(self, path: list[str|int]):
+        """Get item in namespace data using a path object."""
+        return 
+
     def validate(self): ...
 
     def __repr__(self):

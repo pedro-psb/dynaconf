@@ -11,7 +11,7 @@ class BaseData:
     def __init_dynaconf__(self, dynaconf_core: DynaconfCore):
         self.__node_metadata__["core"] = dynaconf_core
 
-    def __get_dynaconf__(self, raises=True):
+    def __get_dynaconf__(self, raises=True) -> DynaconfCore:
         dynaconf_core = self.__node_metadata__["core"]
         if not dynaconf_core and raises is True:
             raise DynaconfNotInitialized("Dynaconf not initialized.")
