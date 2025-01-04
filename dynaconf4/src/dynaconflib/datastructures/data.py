@@ -1,6 +1,7 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
 from dynaconflib.exceptions import DynaconfNotInitialized
+from collections import defaultdict
 
 if TYPE_CHECKING:
     from dynaconflib.core import DynaconfCore
@@ -26,6 +27,7 @@ class DataDict(dict, BaseData):
             "core": None,
             "id": id(self) % 100,
             "namespace": None,
+            "patched_keys": defaultdict(list),
         }
         convert_containers(self, self.items())
 
@@ -52,7 +54,11 @@ class DataDict(dict, BaseData):
 class DataList(list, BaseData):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.__node_metadata__ = {"path": None, "core": None}
+        self.__node_metadata__ = {
+            "path": None,
+            "core": None,
+            "patched_keys": defaultdict(list),
+        }
         convert_containers(self, enumerate(self))
 
     def copy(self):

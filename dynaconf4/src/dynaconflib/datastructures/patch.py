@@ -53,21 +53,28 @@ class PatchEngine:
             return
 
         for patch in patch_list:
+            # get last container from path
             prev_container_v = container_v = base
             schema_path = self.schema.get_path(from_raw=patch.path)
-            # walk to get last container
             for i, node in enumerate(schema_path[:-1]):
                 container_v = prev_container_v[node.key]
                 prev_container_v = container_v
+
             # apply on last node
             operation: BasePatchOperation = self.registry.get(patch.operation_id)
+            final_key = schema_path[-1].key
             value = self.create_container_or_get_item(patch.value)
             try:
-                operation.apply(container_v, schema_path[-1].key, value)
-            except MergeError as e:
+                operation.apply(container_v, final_key, value)
+            except Exception as e:
                 raise MergeError(
                     f"{str(e)}\nFrom LoadRequest({patch.load_request.id_string()!r})."
                 ) from e
+
+            # update container inspect info
+            container_v.__node_metadata__["patched_keys"][final_key].append(
+                patch.load_request
+            )
 
     def create(self, data: dict, load_request: LoadRequest) -> list[Patch]:
         type_guard(data, dict)
