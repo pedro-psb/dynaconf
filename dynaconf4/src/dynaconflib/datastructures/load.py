@@ -5,9 +5,11 @@ from .standard import PriorityField
 from collections import defaultdict
 from dynaconflib.utils import type_guard
 from dynaconflib.exceptions import LoadError
+from dataclasses import dataclass, field, asdict
 
 
-class LoadRequest(NamedTuple):
+@dataclass
+class LoadRequest:
     """
     Params:
         loader_id: The id of the loader to be used.
@@ -21,10 +23,15 @@ class LoadRequest(NamedTuple):
 
     loader_id: str
     uri: str
-    priority_field: PriorityField = PriorityField()  # the same instance
+    priority_field: PriorityField = field(
+        default_factory=PriorityField
+    )
     namespace_in_root: bool = None
     namespace_filter: Optional[list] = None
     direct_data: Optional[dict] = None
+
+    def inspect(self) -> dict:
+        return asdict(self)
 
     def id_string(self):
         return f"{self.loader_id}:{self.uri}"

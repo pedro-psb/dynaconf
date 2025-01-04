@@ -23,6 +23,7 @@ from dynaconflib.utils import (
     setup_limit,
     container_items,
     type_guard,
+    rich_print,
 )
 from typing import Optional, Callable
 from dynaconflib.exceptions import UnknownNamespace
@@ -168,16 +169,12 @@ class DynaconfCore:
             self.namespaces.reconcile()
 
     def debug(self):
-        s = "    "
-        print(f"\n{self.load_request_q=}")
-        print("namespaces:")
-        for k, ns in self.namespaces.items():
-            print(f"{s}- {k}")
-            print(f"{s*2}{ns.data=}")
-            print(f"{s*2}{ns.loaded_q=}")
-            print(f"{s*2}{ns.patch_q=}")
-            print(f"{s*2}{ns.patch_lazy_q=}")
-            print(f"{s*2}{ns.done_q=}")
+        data = {
+            "core": self,
+            "load_requests_q": self.load_request_q,
+            "namespaces": {k: ns for k, ns in self.namespaces.items()},
+        }
+        rich_print(data)
 
     def __repr__(self):
         return f"{self.__class__.__name__}({self.id=}, {self.status})"
@@ -208,9 +205,21 @@ class NamespaceState:
         )
         self.loaded_q.push(proc_unit)
 
-    def get(self, path: list[str|int]):
+    def get(self, path: list[str | int]):
         """Get item in namespace data using a path object."""
-        return 
+        return
+
+    def items(self):
+        """Return tuple of (path,value) for all items."""
+
+        def walk(node: dict | list, path: tuple):
+            for k, v in container_items(node):
+                new_path = path + (k,)
+                yield (new_path, v)
+                if isinstance(node, (dict, list)):
+                    walk(v, new_path)
+
+        return walk(self.data, tuple())
 
     def validate(self): ...
 
@@ -251,7 +260,7 @@ class NamespaceSet:
         front_ns = self.get("_frontend")
         front_md = front_ns.data.__node_metadata__
         front_ns.data.clear()
-        front_ns.data.__node_metadata__ = front_md
+        front_ns.data.__node_metadata__ = current_ns.data.__node_metadata__
         # front_ns.data.__node_metadata__["namespace"] = current_ns.name
 
         # Update data-node metadata to reconcile changes
@@ -295,6 +304,8 @@ class NamespaceSet:
     def filter(self, namespaces: list[str] | type[all]) -> list[NamespaceState]:
         if namespaces is all:
             return [self.get(ns_k) for ns_k in self.keys()]
+        if namespaces is None:
+            return []
 
         # validate and filter
         for ns_k in namespaces:

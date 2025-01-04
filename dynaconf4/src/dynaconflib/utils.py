@@ -1,9 +1,10 @@
 from __future__ import annotations
 import json
-from typing import TYPE_CHECKING
-from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any
+from dataclasses import dataclass, field, is_dataclass, asdict
 from functools import partial
 from enum import Enum
+import rich
 
 if TYPE_CHECKING:
     from dynaconflib.datastructures import DataDict, DataList
@@ -15,9 +16,27 @@ class SENTINEL(Enum):
     """
 
     empty = 0
+    undefined_type = 1
 
 
 Empty = SENTINEL.empty
+
+
+def json_print(o):
+    rich.print_json(json.dumps(o, cls=DynaconfJSONEncoder))
+
+
+def rich_print(o):
+    rich.print(o)
+
+
+def node_history(node: DataDict | DataList) -> dict[str | int, list]:
+    return node.__node_metadata__["patched_keys"]
+
+
+def dump(o):
+    support_dump = getattr(o, "dump", False)
+    return o.dump() if support_dump else o
 
 
 def xor(a, b) -> bool:
@@ -26,6 +45,20 @@ def xor(a, b) -> bool:
 
 def ensure_list(o: list[str | str]) -> list:
     return o if isinstance(o, list) else [o]
+
+
+class DynaconfJSONEncoder(json.JSONEncoder):
+    def default(self, obj: Any) -> Any:
+        if is_dataclass(obj):
+            return asdict(obj)
+        if isinstance(obj, Enum):
+            return str(obj)
+        if isinstance(obj, tuple) and hasattr(obj, "_asdict"):  # namedtuple
+            breakpoint()
+            return obj._asdict()
+        if isinstance(obj, type):
+            return str(obj)
+        return super().default(obj)
 
 
 def data_print(data: DataDict | DataList, format="json", debug=False):
@@ -38,7 +71,7 @@ def data_print(data: DataDict | DataList, format="json", debug=False):
     """
     # pretty json print
     if not debug:
-        print(json.dumps(data, indent=4))
+        rich.print_json(json.dumps(data, indent=4, cls=DynaconfJSONEncoder))
         return
 
     # debug print
@@ -55,6 +88,10 @@ def data_print(data: DataDict | DataList, format="json", debug=False):
                 v.to_compact_data() for v in self.children if isinstance(v, Node)
             ]
             metadata = {k: repr(v) for k, v in self.metadata.items()}
+            metadata["patched_keys"] = {
+                k: [n.inspect() for n in v]
+                for k, v in self.metadata["patched_keys"].items()
+            }
             data = {
                 "compact_id": f"{self.key!r}, {self.key.__class__.__name__}, {self.value_type}",
                 "metadata": metadata,
@@ -87,7 +124,9 @@ def data_print(data: DataDict | DataList, format="json", debug=False):
         children=walk(data),
     )
     # print(root)
-    print(json.dumps(root.to_compact_data(), indent=4))
+    rich.print_json(
+        json.dumps(root.to_compact_data(), indent=4, cls=DynaconfJSONEncoder)
+    )
 
 
 data_debug = partial(data_print, debug=True)

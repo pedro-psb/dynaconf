@@ -4,20 +4,31 @@ from .schema import SchemaTree, SchemaNode
 from .data import DataDict, DataList
 from .load import LoadRequest
 from typing import Any, NamedTuple, TYPE_CHECKING
-from dynaconflib.utils import type_guard, container_items
+from dynaconflib.utils import type_guard, container_items, dump
 from dynaconflib.exceptions import MergeError
+from dataclasses import dataclass, asdict
 
 if TYPE_CHECKING:
     from dynaconflib.registry import PatchOpRegistry
 
 
-class Patch(NamedTuple):
-    operation_id: str
+class New: ...
+
+
+@dataclass
+class Patch:
+    operation: str
     path: list
     value: Any
     load_request: LoadRequest
     lazy: bool = False
-    dependencies: list[Patch] = []
+
+    def inspect(self):
+        """Return data for inspect dump."""
+        data = asdict(self)
+        data["path"] = "/" + "/".join(self.path)
+        data["load_request"] = self.load_request.inspect()
+        return data
 
 
 class BasePatchOperation:
@@ -61,7 +72,7 @@ class PatchEngine:
                 prev_container_v = container_v
 
             # apply on last node
-            operation: BasePatchOperation = self.registry.get(patch.operation_id)
+            operation: BasePatchOperation = self.registry.get(patch.operation)
             final_key = schema_path[-1].key
             value = self.create_container_or_get_item(patch.value)
             try:
@@ -72,9 +83,7 @@ class PatchEngine:
                 ) from e
 
             # update container inspect info
-            container_v.__node_metadata__["patched_keys"][final_key].append(
-                patch.load_request
-            )
+            container_v.__node_metadata__["patched_keys"][final_key].append(patch)
 
     def create(self, data: dict, load_request: LoadRequest) -> list[Patch]:
         type_guard(data, dict)

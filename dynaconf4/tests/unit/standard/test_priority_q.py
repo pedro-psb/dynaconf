@@ -8,6 +8,12 @@ class Item:
     priority_field: PriorityField
 
 
+def test_priority_field():
+    priority_field = PriorityField()
+    assert isinstance(priority_field.priority, int)
+    assert isinstance(priority_field.group, int)
+
+
 def test_priority_q():
     GREEN = PriorityQueue.PRIORITY_GROUP_SET.GREEN
     ORANGE = PriorityQueue.PRIORITY_GROUP_SET.ORANGE

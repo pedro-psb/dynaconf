@@ -1,5 +1,7 @@
 from __future__ import annotations
 from typing import NamedTuple
+from dynaconflib.utils import SENTINEL
+from dynaconflib.exceptions import SchemaError
 
 
 class SchemaNode(NamedTuple):
@@ -11,8 +13,8 @@ class SchemaNode(NamedTuple):
     def __eq__(self, o):
         return all([getattr(o, f) == getattr(self, f) for f in self._fields])
 
-class Index(int):
 
+class Index(int):
     def __eq__(self, o):
         return type(self) is type(o)
 
@@ -57,14 +59,33 @@ class SchemaTree:
             key, key_type, value_type, children_key_type
         )
 
-    def get(self, key_path) -> SchemaNode:
-        return self.type_map[tuple(key_path)]
+    def get(self, key_path, raises=True) -> SchemaNode:
+        try:
+            return self.type_map[tuple(key_path)]
+        except KeyError as e:
+            if raises is False:
+                return None
+            raise SchemaError(
+                f"Failed to find node in path={str(e)}. Strict-mode={self.strict}."
+            )
 
     def get_path(self, *, from_raw: tuple[str]) -> list[SchemaNode]:
         if self.strict:
             return self._create_schema_path(from_raw)
         else:
             return self._create_default_schema_path(from_raw)
+
+    def compute_default_schema(self, root_data: dict, path=None):
+        """Compute default schema for non-strict schema mode.
+
+        When strict-mode is False, data can contain unknown node types. Either a schema was
+        provided for some nodes but data contains extra nodes or no schema was provided.
+        In this case, we use existing data structure to create a schema_map.
+
+        Params:
+            root_data: The source of truth for the types.
+            path: The path to a sub-node where the computing will being. Default=(,) (root).
+        """
 
     def _create_schema_path(self, from_raw: tuple[str]) -> list[SchemaNode]:
         final = []
