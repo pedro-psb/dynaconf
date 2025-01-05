@@ -1,5 +1,6 @@
 from dynaconflib.datastructures import PriorityField, PriorityQueue
 from dataclasses import dataclass
+from dynaconflib.utils import json_print
 
 
 @dataclass
@@ -46,5 +47,7 @@ def test_priority_q():
     for item in items:
         priority_q.push(item)
 
+    json_print(priority_q)
     pop_sequence = [priority_q.pop().name for _ in range(len(priority_q))]
     assert pop_sequence == expected
+

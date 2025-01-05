@@ -18,6 +18,9 @@ class LinearDataStructure(Generic[T]):
     def is_empty(self) -> bool:
         return len(self._data) == 0
 
+    def __json_encode__(self):
+        return self._data
+
     def __repr__(self):
         return repr(self._data)
 
@@ -90,6 +93,10 @@ class PriorityQueue(Generic[T]):
 
     def copy(self):
         return self.__copy__()
+
+    def __json_encode__(self):
+        o = self.copy()
+        return [o.pop() for n in range(len(o))]
 
     def __contains__(self, item: T) -> bool:
         return any(ituple[self.ITEM_POSITION] == item for ituple in self._queue)

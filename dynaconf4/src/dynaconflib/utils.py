@@ -3,11 +3,30 @@ import json
 from typing import TYPE_CHECKING, Any
 from dataclasses import dataclass, field, is_dataclass, asdict
 from functools import partial
-from enum import Enum
+from enum import Enum, IntEnum
 import rich
 
 if TYPE_CHECKING:
     from dynaconflib.datastructures import DataDict, DataList
+
+
+class VerboseLevel(IntEnum):
+    MINIMAL = 0
+    VERBOSE = 1
+    DEBUG = 2
+
+    @staticmethod
+    def get():
+        global GLOBAL_VERBOSE
+        return GLOBAL_VERBOSE
+
+    @staticmethod
+    def set(verbose: VerboseLevel):
+        global GLOBAL_VERBOSE
+        GLOBAL_VERBOSE = verbose
+
+
+GLOBAL_VERBOSE = VerboseLevel.MINIMAL
 
 
 class SENTINEL(Enum):
@@ -49,6 +68,15 @@ def ensure_list(o: list[str | str]) -> list:
 
 class DynaconfJSONEncoder(json.JSONEncoder):
     def default(self, obj: Any) -> Any:
+        has_custom_encode_method = getattr(obj, "__json_encode__", False)
+        if has_custom_encode_method:
+            json_prepared = obj.__json_encode__()
+            if isinstance(json_prepared, dict):
+                data = {"class": obj.__class__.__name__}
+                data.update(json_prepared)
+                return data
+            else:
+                return json_prepared
         if is_dataclass(obj):
             return asdict(obj)
         if isinstance(obj, Enum):

@@ -25,10 +25,12 @@ from dynaconflib.utils import (
     container_items,
     type_guard,
     rich_print,
+    json_print,
+    VerboseLevel,
 )
 from typing import Optional, Callable
 from dynaconflib.exceptions import UnknownNamespace
-from enum import Enum, auto
+from enum import Enum, auto, IntEnum
 from contextlib import contextmanager
 
 
@@ -51,9 +53,11 @@ class DynaconfCore:
     STATUS_SET = CoreStatus
 
     def __init__(self, id: str, schema: Optional[SchemaTree] = None):
-        # common
+        # general
         self.id = id
         self.status = self.STATUS_SET.WAITING
+        self.active_procunit = None
+        # assets
         self.schema = schema or SchemaTree()
         self.registries = RegistrySet().setup_builtin()
         patch_registry = self.registries.patch_operations
@@ -122,20 +126,34 @@ class DynaconfCore:
         self.process_api(load=all, merge=all)
 
     @contextmanager
-    def status_context(self, status: CoreStatus):
+    def status_ctx(self, status: CoreStatus):
         original = self.status
         try:
             self.status = status
             yield
-        finally:
+        except:
+            raise
+        else:
             self.status = original
+
+    @contextmanager
+    def active_procunit_ctx(self, procunit: ProcUnit) -> ProcUnit:
+        """Keeps record of the active processing unit. Useful for debugging."""
+        try:
+            self.active_procunit = procunit
+            yield procunit
+        except:
+            self.debug()
+            raise
+        else:
+            self.active_procunit = None
 
     def is_merging(self) -> bool:
         return self.status == self.STATUS_SET.MERGING
 
     def _load(self, namespace_filter=None):
         """Load one pending requests and add to namespaces."""
-        with self.status_context(self.STATUS_SET.LOADING):
+        with self.status_ctx(self.STATUS_SET.LOADING):
             load_request = self.load_request_q.pop()
             loader = self.registries.loaders.get(load_request.loader_id)
             result = loader.load(load_request, self.load_context)
@@ -145,24 +163,31 @@ class DynaconfCore:
 
     def _merge(self, ns_state: NamespaceState):
         """Merge one item from ns.load_q into ns.main."""
-        with self.status_context(self.STATUS_SET.MERGING):
+        with self.status_ctx(self.STATUS_SET.MERGING):
+            loaded_q = ns_state.loaded_q
+            patch_q = ns_state.patch_q
+            patch_lazy_q = ns_state.patch_lazy_q
+            done_q = ns_state.done_q
+
             # create patch and move to patch_q
-            proc_unit = ns_state.loaded_q.pop().process_loaded()
-            ns_state.patch_q.push(proc_unit)
+            with self.active_procunit_ctx(loaded_q.pop()) as proc_unit:
+                proc_unit.process_loaded()
+                patch_q.push(proc_unit)
 
             # apply patch and move to lazy_q
-            proc_unit = ns_state.patch_q.pop().process_patch()
-            if proc_unit.has_lazy_patches():
-                ns_state.patch_lazy_q.push(proc_unit)
-            else:
-                ns_state.done_q.push(proc_unit)
+            with self.active_procunit_ctx(patch_q.pop()) as proc_unit:
+                proc_unit.process_patch()
+                if proc_unit.has_lazy_patches():
+                    patch_lazy_q.push(proc_unit)
+                else:
+                    done_q.push(proc_unit)
 
             # final ingestion state
             self.namespaces.reconcile()
 
     def _merge_lazy(self, ns_state: NamespaceState):
         """Merge one lazy item from ns.load_lazy_q into ns.main."""
-        with self.status_context(self.STATUS_SET.MERGING):
+        with self.status_ctx(self.STATUS_SET.MERGING):
             # apply lazy and move to doneQ
             proc_unit = ns_state.patch_lazy_q.pop().process_patches_lazy()
             ns_state.done_q.push(proc_unit)
@@ -170,13 +195,29 @@ class DynaconfCore:
             # final ingestion state
             self.namespaces.reconcile()
 
-    def debug(self):
+    def debug(self, verbose: VerboseLevel = None):
+        if verbose:
+            VerboseLevel.set(verbose)
+
+        def ns_data(ns: NamespaceState):
+            return {
+                "loaded_q": ns.loaded_q,
+                "patch_q": ns.patch_q,
+                "patch_lazy_q": ns.patch_lazy_q,
+                "done_q": ns.done_q,
+            }
+
         data = {
             "core": self,
             "load_requests_q": self.load_request_q,
-            "namespaces": {k: ns for k, ns in self.namespaces.items()},
+            "active_procunit": self.active_procunit,
+            "namespaces": {k: ns_data(ns) for k, ns in self.namespaces.items()},
         }
-        rich_print(data)
+        # rich_print(data)
+        json_print(data)
+
+    def __json_encode__(self):
+        return {"class": self.__class__.__name__, "id": self.id, "status": self.status}
 
     def __repr__(self):
         return f"{self.__class__.__name__}({self.id=}, {self.status})"
@@ -405,6 +446,22 @@ class ProcUnit:
         self.loaded.clear()
         self.patches.clear()
         self.patches_lazy.clear()
+
+    def __json_encode__(self):
+        if VerboseLevel.get() == VerboseLevel.MINIMAL:
+            return {
+                "load_request": self.load_request.id_string(),
+                "loaded": repr(self.loaded),
+                "patches": self.patches,
+                "patches_lazy": self.patches_lazy,
+            }
+        return {
+            "class": self.__class__.__name__,
+            "load_request": self.load_request,
+            "loaded": self.loaded,
+            "patches": self.patches,
+            "patches_lazy": self.patches_lazy,
+        }
 
     def __repr__(self):
         origin_str = f"{self.load_request.loader_id}:{self.load_request.uri}"

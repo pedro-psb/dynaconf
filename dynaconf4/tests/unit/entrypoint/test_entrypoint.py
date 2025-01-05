@@ -57,6 +57,12 @@ nesting = [
         setitem_calls=[Call("a", "b", "c", value="bar")],
         expected={"a": {"b": {"c": "bar"}}},
     ),
+    Scenario(
+        id=Id("nested-kwargs-and-environ"),
+        environ={"DYNACONF_A__b__c": "environ"},
+        kwargs=Kw(a={"b": "kwargs"}),
+        expected={"a": {"b": {"c": "environ"}}},
+    ),
 ]
 
 scenarios = basic + nesting

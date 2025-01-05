@@ -38,7 +38,7 @@ def test_core_workflow():
     load_request = create_load_request(data_input)
     core.enqueue(load_request=load_request)
     assert load_request in core.load_request_q
-    # core.debug()
+    core.debug()
 
     core.process_api(load=all)
     assert load_request not in core.load_request_q
