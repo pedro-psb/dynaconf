@@ -23,12 +23,11 @@ class LoadRequest:
 
     loader_id: str
     uri: str
-    priority_field: PriorityField = field(
-        default_factory=PriorityField
-    )
+    priority_field: PriorityField = field(default_factory=PriorityField)
     namespace_in_root: bool = None
     namespace_filter: Optional[list] = None
     direct_data: Optional[dict] = None
+    base_node: Optional[dict | list] = None
 
     def inspect(self) -> dict:
         return asdict(self)
@@ -58,6 +57,15 @@ class LoadResult:
 
     [0]: load-part = { namespace-0: data, ..., namespace-n: data }
     [1]: result.get("namespace-0") -> [{ns-data}, ..., {ns-data}]
+
+    Example:
+        ```python
+        [
+            {"ns-0": data-0, ..., "ns-k": data-k},  # part 0 with ns-0 to ns-k
+            ...
+            {"ns-0": data-0, "ns-1": data-1},  # part n with ns-0 and ns-1
+        ]
+        ```
     """
 
     def __init__(

@@ -9,6 +9,7 @@ Learn more in [docs](dev/architecture/core.md)
 from __future__ import annotations
 from dynaconflib.datastructures import (
     DataDict,
+    DataList,
     LoadRequest,
     Patch,
     LoadContext,
@@ -112,10 +113,11 @@ class DynaconfCore:
         """Get preload request from namespace's pending_loaded."""
         return []
 
-    def direct_ingest(self, uri: str, path: tuple[str], value):
-        # TODO: add support for LoadRequest to take a path argument
-        key = path[-1]
-        load_request = LoadRequest("builtin.direct", uri, direct_data={key: value})
+    def direct_ingest(self, uri: str, base_node: DataDict | DataList, key, value):
+        _base_node = base_node if base_node.__node_metadata__["path"] else None
+        load_request = LoadRequest(
+            "builtin.direct", uri, direct_data={key: value}, base_node=_base_node
+        )
         self.enqueue(load_request=load_request)
         self.process_api(load=all, merge=all)
 
@@ -345,7 +347,7 @@ class ProcUnit:
         self.load_request = load_request
         self.priority_field = priority_field
         self.patch_engine = patch_engine
-        self.data = data
+        self.data = load_request.base_node or data
         # data
         self.loaded = loaded
         self.patches = []

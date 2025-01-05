@@ -45,10 +45,10 @@ class DataDict(dict, BaseData):
         if not initialized or core.is_merging():
             super().__setitem__(k, ensure_containers(v))
         else:  # caled from user
-            core.direct_ingest("__setattr__", path=(k,), value=v)
+            core.direct_ingest("__setattr__", base_node=self, key=k, value=v)
 
-    def __repr__(self):
-        return f"{self.__class__.__name__}({dict(self)!r})"
+    # def __repr__(self):
+    # return f"{self.__class__.__name__}({dict(self)!r})"
 
 
 class DataList(list, BaseData):
@@ -82,8 +82,8 @@ class DataList(list, BaseData):
     def __iadd__(self, v):
         return super().__iadd__(ensure_containers(v))
 
-    def __repr__(self):
-        return f"{self.__class__.__name__}({list(self)!r})"
+    # def __repr__(self):
+    # return f"{self.__class__.__name__}({list(self)!r})"
 
 
 def convert_containers(data, iter):

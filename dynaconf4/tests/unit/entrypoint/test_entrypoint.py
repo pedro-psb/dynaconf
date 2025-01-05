@@ -50,8 +50,16 @@ basic = [
         expected={"a": "foo", "b": "bar"},
     ),
 ]
+nesting = [
+    Scenario(
+        id=Id("nested-setitem"),
+        environ={"DYNACONF_A__b__c": "foo"},
+        setitem_calls=[Call("a", "b", "c", value="bar")],
+        expected={"a": {"b": {"c": "bar"}}},
+    ),
+]
 
-scenarios = basic
+scenarios = basic + nesting
 
 
 @pytest.mark.parametrize("scenario", scenarios, ids=get_ids(scenarios))
@@ -79,7 +87,11 @@ def test_entrypoint_noschema(scenario: Scenario, monkeypatch):
     settings = Dynaconf(*args, **kwargs)
     for call_args in setitem_calls:
         key_path, value = call_args
-        settings[key_path[0]] = value
+        node_prev = settings
+        for path_cur in key_path[:-1]:
+            node_prev = node_prev[path_cur]
+        last_key = key_path[-1]
+        node_prev[last_key] = value
 
     # THEN
     core = settings.__get_dynaconf__()
