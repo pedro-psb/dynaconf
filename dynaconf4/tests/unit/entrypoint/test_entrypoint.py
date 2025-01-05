@@ -35,12 +35,12 @@ basic = [
     Scenario(id=Id("sanity-check"), expected={}),
     Scenario(
         id=Id("simple-data"),
-        kwargs=Kw(data={"a": 1, "b": 2}),
+        kwargs=Kw(a=1, b=2),
         expected={"a": 1, "b": 2},
     ),
     Scenario(
         id=Id("simple-setitem-calls"),
-        kwargs=Kw(data={"a": 1, "b": 2}),
+        kwargs=Kw(a=1, b=2),
         setitem_calls=[Call("c", value=3)],
         expected={"a": 1, "b": 2, "c": 3},
     ),

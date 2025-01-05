@@ -74,8 +74,6 @@ def get_nodes(namespace: NamespaceState, terminal_only):
     def walk(node, path):
         for k, v in container_items(node):
             # filters
-            if terminal_only and not is_terminal(v):
-                continue
 
             # create inspect node
             new_path = path + (k,)
@@ -90,11 +88,12 @@ def get_nodes(namespace: NamespaceState, terminal_only):
             )
             if isinstance(v, (dict, list)):
                 _history = node_history(v)
-                nodes.append(new_node(child_patches=_history))
+                if not terminal_only:
+                    nodes.append(new_node(child_patches=_history))
                 walk(v, new_path)
             else:
                 _history = {"__self__": node_history(node).get(k)}
                 nodes.append(new_node(child_patches=_history))
 
-    walk(settings, tuple())
+    walk({"root": settings}, tuple())
     return nodes
