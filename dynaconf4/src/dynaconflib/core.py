@@ -274,7 +274,7 @@ class NamespaceSet:
     def __init__(
         self, registries: RegistrySet, patch_engine: PatchEngine, core: DynaconfCore
     ):
-        self._current = "default"
+        self._current = "main"
         self.core = core
         self.patch_engine = patch_engine
         self.registries = registries
@@ -301,7 +301,6 @@ class NamespaceSet:
         """
         current_ns = self.get_current()
         front_ns = self.get("_frontend")
-        front_md = front_ns.data.__node_metadata__
         front_ns.data.clear()
         front_ns.data.__node_metadata__ = current_ns.data.__node_metadata__
         # front_ns.data.__node_metadata__["namespace"] = current_ns.name

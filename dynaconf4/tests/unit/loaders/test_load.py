@@ -26,7 +26,7 @@ direct = [
             uri="unit_test",
             direct_data={"foo": "from-load-1"},
         ),
-        expected=[{"default": {"foo": "from-load-1"}}],
+        expected=[{"main": {"foo": "from-load-1"}}],
     ),
     Scenario(
         id="direct:with-root-envs",
@@ -34,12 +34,12 @@ direct = [
             loader_id="builtin.direct",
             uri="unit_test",
             direct_data={
-                "default": {"foo": "from-load-2"},
+                "main": {"foo": "from-load-2"},
                 "prod": {"foo": "prod-bar"},
             },
             namespace_in_root=True,
         ),
-        expected=[{"default": {"foo": "from-load-2"}, "prod": {"foo": "prod-bar"}}],
+        expected=[{"main": {"foo": "from-load-2"}, "prod": {"foo": "prod-bar"}}],
     ),
 ]
 envvars_schema = [
@@ -51,7 +51,7 @@ envvars_schema = [
         ),
         envvar_data={"DYNACONF_MY_KEY": "123"},
         schema_items=[(["my_key"], int)],
-        expected=[{"default": {"my_key": "123"}}],
+        expected=[{"main": {"my_key": "123"}}],
     ),
     Scenario(
         id="envvar:no-nesting-no-schema",
@@ -61,7 +61,7 @@ envvars_schema = [
         ),
         envvar_data={"DYNACONF_MY_KEY": "123"},
         schema_items=[(["my_key"], int)],
-        expected=[{"default": {"my_key": "123"}}],
+        expected=[{"main": {"my_key": "123"}}],
     ),
     Scenario(
         id="envvar:dict-nesting",
@@ -71,7 +71,7 @@ envvars_schema = [
         ),
         envvar_data={"DYNACONF_MYDICT__MYKEY": "123"},
         schema_items=[(["mydict"], dict), (["mydict", "mykey"], int)],
-        expected=[{"default": {"mydict": {"mykey": "123"}}}],
+        expected=[{"main": {"mydict": {"mykey": "123"}}}],
     ),
     Scenario(
         id="envvar:dict-nesting2",
@@ -86,7 +86,7 @@ envvars_schema = [
             (["mydict", "foo", "bar"], dict),
             (["mydict", "foo", "bar", "mykey"], int),
         ],
-        expected=[{"default": {"mydict": {"foo": {"bar": {"mykey": "123"}}}}}],
+        expected=[{"main": {"mydict": {"foo": {"bar": {"mykey": "123"}}}}}],
     ),
     Scenario(
         id="envvar:list-nesting",
@@ -99,7 +99,7 @@ envvars_schema = [
             (["mylist"], list),
             (["mylist", Index()], int),
         ],
-        expected=[{"default": {"mylist": ["123"]}}],
+        expected=[{"main": {"mylist": ["123"]}}],
     ),
 ]
 
@@ -111,7 +111,7 @@ envvars_noschema = [
             uri="unit_test",
         ),
         envvar_data={"DYNACONF_MYKEY": "123"},
-        expected=[{"default": {"mykey": "123"}}],
+        expected=[{"main": {"mykey": "123"}}],
     ),
     Scenario(
         id="noschema:envvar:no-nesting",
@@ -120,13 +120,13 @@ envvars_noschema = [
             uri="unit_test",
         ),
         envvar_data={"DYNACONF_MYKEY__0": "123"},
-        expected=[{"default": {"mykey": ["123"]}}],
+        expected=[{"main": {"mykey": ["123"]}}],
     ),
 ]
 
 expected_for_files = {
     "no-namespaces": {
-        "default": {
+        "main": {
             "database": {"host": "https://localhost", "port": 5432},
             "user": {"name": "john"},
         }

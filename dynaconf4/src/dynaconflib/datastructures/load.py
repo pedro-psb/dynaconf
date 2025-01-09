@@ -37,7 +37,7 @@ class LoadRequest:
 
 
 class LoadContext(NamedTuple):
-    namespace_default: str = "default"
+    namespace_main: str = "main"
     namespace_in_root: bool = False
     namespace_filter: list[str] = None
     envvar_prefix: str = None
@@ -82,12 +82,12 @@ class LoadResult:
         namespace_in_root = (
             load_request.namespace_in_root or load_context.namespace_in_root
         )
-        namespace_default = load_context.namespace_default
+        namespace_main = load_context.namespace_main
         for data_part in data_parts:
             if namespace_in_root is True:
                 data_part = {env: data for env, data in data_part.items()}
             else:
-                data_part = {namespace_default: data_part}
+                data_part = {namespace_main: data_part}
             self.add(data_part)
 
     def add(self, data_part):

@@ -27,7 +27,9 @@ class Replace(BasePatchOperation):
         try:
             data[key] = value
         except IndexError:
-            raise MergeError(f"Index out for range: can't replace at index={key} on {data=}.")
+            raise MergeError(
+                f"Index out for range: can't replace at index={key} on {data=}."
+            )
 
 
 class Append(BasePatchOperation):
