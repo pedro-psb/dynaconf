@@ -38,7 +38,7 @@ class LoadRequest:
 
 class LoadContext(NamedTuple):
     namespace_main: str = "main"
-    namespace_in_root: bool = False
+    namespace_in_root: bool = None
     namespace_filter: list[str] = None
     envvar_prefix: str = None
     schema_strict: bool = True

@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypedDict, Optional
 from dynaconflib.exceptions import DynaconfNotInitialized
 from collections import defaultdict
 
@@ -17,17 +17,25 @@ class BaseData:
             raise DynaconfNotInitialized("Dynaconf not initialized.")
         return dynaconf_core
 
+class NodeMetadata(TypedDict):
+    id: int
+    patched_keys: dict[list]  # patched_paths
+    path: Optional[list[str]]
+    core: Optional[DynaconfCore]
+    default_node: DataDict | DataList
+
 
 class DataDict(dict, BaseData):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # dont know why I cant move metadata init to the BaseData init
-        self.__node_metadata__ = {
+        self.__node_metadata__: NodeMetadata = {
             "path": None,
             "core": None,
             "id": id(self) % 100,
             "namespace": None,
             "patched_keys": defaultdict(list),
+            "default_node": None,
         }
         convert_containers(self, self.items())
 
@@ -46,6 +54,27 @@ class DataDict(dict, BaseData):
             super().__setitem__(k, ensure_containers(v))
         else:  # caled from user
             core.direct_ingest("__setattr__", base_node=self, key=k, value=v)
+
+    def __getitem__(self, k):
+        initialized = core = self.__get_dynaconf__(raises=False)
+        if not initialized or core.is_merging():
+            return super().__getitem__(k)
+        # caled from user
+        try:
+            value = super().__getitem__(k)
+        except KeyError:
+            default_node = self.__node_metadata__["default_node"]
+            if not default_node or k not in default_node:
+                raise
+            value = default_node[k]
+        return value
+
+    def __repr__(self):
+        # Pretend its merged. If repr is being called too much, we need to cache this.
+        # Maybe we could keep the merged version updated on reconcile
+        # Or we can use a plain ChainMap
+        default_node = self.__node_metadata__["default_node"] or {}
+        return repr(self | default_node)
 
     # def __repr__(self):
     # return f"{self.__class__.__name__}({dict(self)!r})"

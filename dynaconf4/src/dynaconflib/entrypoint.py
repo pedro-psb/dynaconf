@@ -30,16 +30,19 @@ class BaseSchema(DataDict):
 
 
 def Dynaconf(schema: type[T] = BaseSchema, *args, **kwargs) -> T:
-    special_kwargs = ("setting_files", "environments", "instance_id")
+    special_kwargs = ("setting_files", "environments", "instance_id", "namespace_in_root")
 
     # parse init arguments
     instance_id = kwargs.get("name", "dynaconf")
     setting_files = ensure_list(kwargs.get("setting_files", []))
     data = {k: v for k, v in kwargs.items() if k.lower() not in special_kwargs}
+    namespace_in_root = kwargs.get("namespace_in_root", None)
 
     # initialize main data instance and dynaconf core
     schema_tree = SchemaTree.from_cls(schema)
-    dynaconf_core = DynaconfCore(instance_id, schema_tree)
+    dynaconf_core = DynaconfCore(
+        instance_id, schema_tree, namespace_in_root=namespace_in_root
+    )
     dynaconf_api = DynaconfApi(dynaconf_core)
     settings = schema(dynaconf_api)
 

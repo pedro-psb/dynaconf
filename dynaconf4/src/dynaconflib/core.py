@@ -27,6 +27,7 @@ from dynaconflib.utils import (
     rich_print,
     json_print,
     VerboseLevel,
+    Empty,
 )
 from typing import Optional, Callable
 from dynaconflib.exceptions import UnknownNamespace
@@ -52,7 +53,9 @@ class CoreStatus(Enum):
 class DynaconfCore:
     STATUS_SET = CoreStatus
 
-    def __init__(self, id: str, schema: Optional[SchemaTree] = None):
+    def __init__(
+        self, id: str, schema: Optional[SchemaTree] = None, namespace_in_root=None
+    ):
         # general
         self.id = id
         self.status = self.STATUS_SET.WAITING
@@ -65,7 +68,9 @@ class DynaconfCore:
         self.namespaces = NamespaceSet(self.registries, self.patch_engine, self)
         # load
         self.load_context = LoadContext(
-            schema_tree=self.schema, schema_strict=self.schema.strict
+            schema_tree=self.schema,
+            schema_strict=self.schema.strict,
+            namespace_in_root=namespace_in_root or False,
         )
         self.load_request_q = PriorityQueue[LoadRequest]()
 
@@ -300,26 +305,31 @@ class NamespaceSet:
         * Update metadata for every (modified) data-node.
         """
         current_ns = self.get_current()
+        default_ns = self.get("default")
         front_ns = self.get("_frontend")
         front_ns.data.clear()
         front_ns.data.__node_metadata__ = current_ns.data.__node_metadata__
         # front_ns.data.__node_metadata__["namespace"] = current_ns.name
 
         # Update data-node metadata to reconcile changes
-        # Note:
-        #     This could be done in the patching system, but it is already
-        #     complex enough on its own. If perf impact is too bad, we should
-        #     reconsider
-        def walk(data, path):
+        # TODO: walk along with ns.default to set "default_node" on each node
+        # or do the path strategy on the DataDict
+        def walk(data, path, default_data):
+            if default_data:
+                data.__node_metadata__["default_node"] = default_data
             for k, v in container_items(data):
                 new_path = path + (k,)
                 if isinstance(v, (dict, list)):
                     v.__init_dynaconf__(self.core)
                     v.__node_metadata__["path"] = new_path
                     v.__node_metadata__["namespace"] = current_ns.name
-                    walk(v, new_path)
+                    try:
+                        default_v = default_data[k]
+                    except (IndexError, KeyError, TypeError):
+                        default_v = None
+                    walk(v, new_path, default_v)
 
-        walk(current_ns.data, tuple())
+        walk(current_ns.data, tuple(), default_ns.data)
 
         # Update frontend with shallow copy
         for k, v in current_ns.data.items():
