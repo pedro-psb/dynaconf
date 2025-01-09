@@ -286,9 +286,6 @@ class NamespaceSet:
         self.namespaces: dict[str, NamespaceState] = {}
 
         # initial namespaces
-        # TODO: consider using 'main' when namespaces are disabled, so
-        # it we always have at least: ns-main + ns-default (fallback)
-        # For now its not being used and default is also the main.
         self.create("default")
         self.create("main")
 
@@ -312,8 +309,6 @@ class NamespaceSet:
         # front_ns.data.__node_metadata__["namespace"] = current_ns.name
 
         # Update data-node metadata to reconcile changes
-        # TODO: walk along with ns.default to set "default_node" on each node
-        # or do the path strategy on the DataDict
         def walk(data, path, default_data):
             if default_data:
                 data.__node_metadata__["default_node"] = default_data
