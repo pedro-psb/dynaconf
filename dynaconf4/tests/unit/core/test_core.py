@@ -25,7 +25,7 @@ def test_core_workflow():
     schema.add(["a", "x"], int)
     schema.add(["a", "y"], bool)
     core = DynaconfCore("dynaconf_test", schema)
-    default_namespace = core.namespaces.get_current()
+    default_namespace = core.namespaces.get_active()
     frontend_namespace = core.namespaces.get("_frontend")
 
     # ensure initial data has dynaconf initialized

@@ -279,7 +279,7 @@ class NamespaceSet:
     def __init__(
         self, registries: RegistrySet, patch_engine: PatchEngine, core: DynaconfCore
     ):
-        self._current = "main"
+        self._active = "main"
         self.core = core
         self.patch_engine = patch_engine
         self.registries = registries
@@ -301,12 +301,11 @@ class NamespaceSet:
         * Update the frontend-ns data with active-ns data.
         * Update metadata for every (modified) data-node.
         """
-        current_ns = self.get_current()
+        active_ns = self.get_active()
         default_ns = self.get("default")
         front_ns = self.get("_frontend")
         front_ns.data.clear()
-        front_ns.data.__node_metadata__ = current_ns.data.__node_metadata__
-        # front_ns.data.__node_metadata__["namespace"] = current_ns.name
+        front_ns.data.__node_metadata__ = active_ns.data.__node_metadata__
 
         # Update data-node metadata to reconcile changes
         def walk(data, path, default_data):
@@ -317,17 +316,17 @@ class NamespaceSet:
                 if isinstance(v, (dict, list)):
                     v.__init_dynaconf__(self.core)
                     v.__node_metadata__["path"] = new_path
-                    v.__node_metadata__["namespace"] = current_ns.name
+                    v.__node_metadata__["namespace"] = active_ns.name
                     try:
                         default_v = default_data[k]
                     except (IndexError, KeyError, TypeError):
                         default_v = None
                     walk(v, new_path, default_v)
 
-        walk(current_ns.data, tuple(), default_ns.data)
+        walk(active_ns.data, tuple(), default_ns.data)
 
         # Update frontend with shallow copy
-        for k, v in current_ns.data.items():
+        for k, v in active_ns.data.items():
             front_ns.data[k] = v
 
     def create(self, name: str):
@@ -341,8 +340,8 @@ class NamespaceSet:
             name, self.registries, self.patch_engine, data
         )
 
-    def get_current(self) -> NamespaceState:
-        return self.get(self._current)
+    def get_active(self) -> NamespaceState:
+        return self.get(self._active)
 
     def get(self, namespace) -> NamespaceState:
         self.exists(namespace)
@@ -366,9 +365,9 @@ class NamespaceSet:
             return False
         return True
 
-    def set_current(self, namespace: str):
+    def set_active(self, namespace: str):
         self.exists(namespace, raises=True)
-        self._current = namespace
+        self._active = namespace
 
     def items(self):
         return self.namespaces.items()
@@ -377,7 +376,7 @@ class NamespaceSet:
         return self.namespaces.keys()
 
     def __repr__(self):
-        return f"{self.__class__.__name__}({self._current=}, {self.namespaces=})"
+        return f"{self.__class__.__name__}({self._active=}, {self.namespaces=})"
 
 
 class ProcUnit:

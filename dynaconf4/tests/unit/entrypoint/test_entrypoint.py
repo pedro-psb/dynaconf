@@ -101,6 +101,6 @@ def test_entrypoint_noschema(scenario: Scenario, monkeypatch):
 
     # THEN
     core = settings.__get_dynaconf__()
-    current_ns = core.namespaces.get_current()
+    active_ns = core.namespaces.get_active()
     assert settings == expected
-    assert current_ns.data == settings
+    assert active_ns.data == settings

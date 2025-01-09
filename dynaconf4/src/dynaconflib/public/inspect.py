@@ -53,7 +53,7 @@ def inspect_api(
 
     terminal_only = terminal_only or True
     keys = keys or None
-    namespaces = core.namespaces.filter(namespaces) or [core.namespaces.get_current()]
+    namespaces = core.namespaces.filter(namespaces) or [core.namespaces.get_active()]
     ns_names = [ns.name for ns in namespaces]
 
     nodes = []
