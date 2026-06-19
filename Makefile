@@ -84,10 +84,15 @@ bump-minor:
 	bump-my-version bump minor
 
 # Release
-# 1. Create release-commit: bump-version to stable + changelog-update + build package
-# 2. Create bump-commit: bump-version to next cycle
-release: clean
-	./scripts/release-main.sh
+# Usage: make release VERSION=x.y.z
+# Validates the expected version, then creates the release and post-release commits.
+# Push is handled by the CI workflow.
+release:
+	@if [ -z "$(VERSION)" ]; then echo "Error: VERSION is required. Usage: make release VERSION=x.y.z"; exit 1; fi
+	# $(MAKE) run-pre-commit
+	# $(MAKE) test_only
+	uv run python .github/scripts/validate_release.py "$(VERSION)"
+	bash .github/scripts/create-release-commit.sh
 
 # Publish
 # 1. Publish to PiPY

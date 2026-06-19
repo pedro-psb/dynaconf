@@ -97,3 +97,4 @@ dynaconf/vendor/source
 *.dat
 tmp*
 *.tsv
+uv.lock

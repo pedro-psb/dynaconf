@@ -170,6 +170,7 @@ omit = [
 # ======
 
 [tool.pytest.ini_options]
+pythonpath = [".github/scripts"]
 markers = [
     "integration: marks tests as integration (deselect with '-m \"not integration\"')",
 ]
