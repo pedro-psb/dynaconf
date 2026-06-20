@@ -161,7 +161,7 @@ def get_calculated_next_version() -> str:
     return result
 
 
-def check_is_allowed_release(version: str) -> None:
+def check_version_format(version: str) -> None:
     """Raise if `version` is not a clean X.Y.Z release (no pre-release suffix)."""
     v = Version(version)
     if v.is_prerelease or v.is_postrelease or v.local:
@@ -313,39 +313,42 @@ def main(expected: str, *, publish: bool = False) -> None:
     repo = Repository()
     run_from_root(repo)
 
+    pypi_versions = fetch_pypi_versions()
+    remote_tags = repo.remote_version_tags(REPO_URL)
+    latest_remote_tag = max(remote_tags, key=Version)
+    calculated = get_calculated_next_version()
+
     _log("mode", "publish" if publish else "release")
     _log("running_ci", RUNNING_CI)
+    _log("next_version", calculated)
+    _log("expected", expected)
     _log("repo_url", REPO_URL)
     _log("pypi_url", PYPI_URL)
+    _log("latest_remote_tag", latest_remote_tag)
 
     if publish:
         # Publish mode: checked out at master with full history.
         # Tag is already on the remote; PyPI publish has not happened yet.
-        check_is_allowed_release(expected)
+
+        check_version_format(expected)
         check_tag_exists_on_remote(repo, expected)
-        remote_tags = repo.remote_version_tags(REPO_URL)
         prior_tags = [t for t in remote_tags if t != expected]
         check_is_contiguous(expected, prior_tags)
-        pypi_versions = fetch_pypi_versions()
+
+        # PyPI
         check_is_unique(expected, pypi_versions)
         check_is_contiguous(expected, pypi_versions)
     else:
         # Release mode: full pre-flight before creating the release commit.
-        pypi_versions = fetch_pypi_versions()
-        remote_tags = repo.remote_version_tags(REPO_URL)
-        latest_remote_tag = max(remote_tags, key=Version)
-        calculated = get_calculated_next_version()
-        _log("latest_remote_tag", latest_remote_tag)
-
         # Local state
         check_on_release_branch(repo)
+        check_version_matches_expected(calculated, expected)
         check_clean_working_tree(repo)
         if not RUNNING_CI:
             check_no_local_tag(repo, expected)
             check_in_sync_with_upstream(repo)
         check_has_unreleased_commits(repo, latest_remote_tag)
-        check_is_allowed_release(expected)
-        check_version_matches_expected(calculated, expected)
+        check_version_format(expected)
 
         # PyPI
         check_is_unique(expected, pypi_versions)

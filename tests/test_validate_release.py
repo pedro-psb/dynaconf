@@ -6,12 +6,12 @@ import pytest
 from validate_release import check_clean_working_tree
 from validate_release import check_has_unreleased_commits
 from validate_release import check_in_sync_with_upstream
-from validate_release import check_is_allowed_release
 from validate_release import check_is_contiguous
 from validate_release import check_is_unique
 from validate_release import check_no_local_tag
 from validate_release import check_on_release_branch
 from validate_release import check_tag_exists_on_remote
+from validate_release import check_version_format
 from validate_release import check_version_matches_expected
 from validate_release import fetch_pypi_versions
 from validate_release import InvalidReleaseError
@@ -258,7 +258,7 @@ class TestCheckIsAllowedRelease:
         ],
     )
     def test_passes(self, version):
-        check_is_allowed_release(version)
+        check_version_format(version)
 
     @pytest.mark.parametrize(
         "version",
@@ -272,4 +272,4 @@ class TestCheckIsAllowedRelease:
     )
     def test_raises(self, version):
         with pytest.raises(InvalidReleaseError):
-            check_is_allowed_release(version)
+            check_version_format(version)
