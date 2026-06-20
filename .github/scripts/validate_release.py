@@ -26,7 +26,7 @@ from packaging.version import InvalidVersion
 from packaging.version import Version
 
 REPO_URL = "https://github.com/pedro-psb/dynaconf.git"  # was dynaconf/dynaconf
-PYPI_URL = "https://pypi.org/pypi/dynaconf/json"  # was pypi.org
+PYPI_URL = "https://test.pypi.org/pypi/dynaconf/json"  # was pypi.org
 RUNNING_CI = bool(os.getenv("CI"))
 
 
