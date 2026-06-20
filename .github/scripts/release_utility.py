@@ -282,6 +282,7 @@ def rolling_release(*, yes: bool = False) -> None:
     info(f"Previous release : {previous}")
     info(f"Next release     : {next_version}")
     validate(next_version)
+    check_backport_branch_compatible(repo, next_version)
 
     if not yes:
         answer = input("Type 'yes' to confirm: ")
@@ -476,6 +477,25 @@ def check_clean_working_tree(repo: Repository) -> None:
     status = repo.working_tree_status()
     if status:
         raise InvalidReleaseError(f"working tree is not clean:\n{status}")
+
+
+def check_backport_branch_compatible(repo: Repository, version: str) -> None:
+    """Raise if the X.Y backport branch exists and has diverged from HEAD.
+
+    A diverged branch means a backport release is in progress on that branch
+    and a rolling release would conflict with it.
+    """
+    major, minor, _ = Version(version).release
+    branch = f"{major}.{minor}"
+    if repo.branch_exists(branch) and not repo.is_ancestor(
+        repo.branch_tip(branch), "HEAD"
+    ):
+        raise InvalidReleaseError(
+            f"backport branch {branch!r} exists and has diverged from HEAD.\n"
+            f"To release {version!r}, either:\n"
+            f"  1) Use the backport-release command if the patch fix belongs on {branch}\n"
+            f"  2) Bump the minor version on master to perform a {major}.{minor + 1}.0 release instead"
+        )
 
 
 def run_from_root(repo: Repository) -> None:
