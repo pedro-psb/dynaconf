@@ -216,13 +216,13 @@ def run(args: argparse.Namespace) -> None:
     if args.command == "validate":
         validate(args.version, publish=args.publish)
     elif args.command == "rolling-release":
-        if args.get_backport_branch:
+        rolling_release(yes=args.yes)
+    elif args.command == "get":
+        if args.item == "backport-branch":
             major, minor, _ = Version(
                 VersionBumper().calculated_next()
             ).release
             info(f"{major}.{minor}")
-        else:
-            rolling_release(yes=args.yes)
     elif args.command == "backport-release":
         raise NotImplementedError("backport-release is not yet implemented")
 
@@ -546,16 +546,27 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Skip confirmation prompt",
     )
-    rolling_parser.add_argument(
-        "--get-backport-branch",
-        action="store_true",
-        help="Print the X.Y backport branch name for the next release and exit",
-    )
 
     subparsers.add_parser(
         "backport-release",
         help="Cut a backport release from a maintenance branch (not yet implemented)",
         formatter_class=HELP_FORMATTER,
+    )
+
+    get_parser = subparsers.add_parser(
+        "get",
+        help="Print a computed release value and exit",
+        description=(
+            "Print a computed release value and exit.\n\n"
+            "Supported items:\n"
+            "  backport-branch  The X.Y branch name for the next release (e.g. 3.3.2 → '3.3', 3.4.0 → '3.4')"
+        ),
+        formatter_class=HELP_FORMATTER,
+    )
+    get_parser.add_argument(
+        "item",
+        choices=["backport-branch"],
+        help="The value to retrieve",
     )
 
     return parser

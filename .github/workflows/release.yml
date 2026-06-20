@@ -39,7 +39,7 @@ jobs:
         run: |
           uv run make release VERSION="${{ inputs.expected-release }}"
           # derives the X.Y backport branch from the release version (e.g. 3.3.2 → "3.3", 3.4.0 → "3.4")
-          BRANCH=$(uv run python .github/scripts/release_utility.py rolling-release --get-backport-branch)
+          BRANCH=$(uv run python .github/scripts/release_utility.py get backport-branch)
           echo "backport-branch=$BRANCH" >> "$GITHUB_OUTPUT"
       - name: Push release
         run: |
