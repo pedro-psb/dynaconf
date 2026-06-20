@@ -35,8 +35,19 @@ jobs:
           git config user.name "${{ github.actor }}"
           git config user.email "${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com"
       - name: Create release commits
+        id: release
         run: |
           uv run make release VERSION="${{ inputs.expected-release }}"
-      - name: Push to master
+          # derives the X.Y backport branch from the release version (e.g. 3.3.2 → "3.3", 3.4.0 → "3.4")
+          BRANCH=$(uv run python .github/scripts/release_utility.py rolling-release --get-backport-branch)
+          echo "backport-branch=$BRANCH" >> "$GITHUB_OUTPUT"
+      - name: Push release
         run: |
-          git push --follow-tags origin master
+          # --atomic ensures all three refs land together or none do.
+          # master: the release commit + post-release bump commit.
+          # tag: the annotated release tag created locally by rolling-release.
+          # backport branch: the X.Y branch created or fast-forwarded by rolling-release.
+          git push --atomic origin \
+            master \
+            "refs/tags/${{ inputs.expected-release }}" \
+            "${{ steps.release.outputs.backport-branch }}"

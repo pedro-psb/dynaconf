@@ -216,7 +216,13 @@ def run(args: argparse.Namespace) -> None:
     if args.command == "validate":
         validate(args.version, publish=args.publish)
     elif args.command == "rolling-release":
-        rolling_release(yes=args.yes)
+        if args.get_backport_branch:
+            major, minor, _ = Version(
+                VersionBumper().calculated_next()
+            ).release
+            info(f"{major}.{minor}")
+        else:
+            rolling_release(yes=args.yes)
     elif args.command == "backport-release":
         raise NotImplementedError("backport-release is not yet implemented")
 
@@ -539,6 +545,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--yes",
         action="store_true",
         help="Skip confirmation prompt",
+    )
+    rolling_parser.add_argument(
+        "--get-backport-branch",
+        action="store_true",
+        help="Print the X.Y backport branch name for the next release and exit",
     )
 
     subparsers.add_parser(
