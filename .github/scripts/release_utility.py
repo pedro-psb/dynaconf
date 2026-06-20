@@ -56,6 +56,10 @@ class Repository:
         )
         return result.stdout.strip(), result.stderr.strip()
 
+    def _git_ok(self, *args) -> bool:
+        result = subprocess.run(["git", *args], capture_output=True)
+        return result.returncode == 0
+
     def current_branch(self) -> str:
         # --abbrev-ref resolves HEAD to the short branch name (e.g. "master").
         # In detached HEAD state it returns the literal string "HEAD".
@@ -161,6 +165,22 @@ class Repository:
 
     def create_tag(self, name: str, message: str) -> None:
         self._git("tag", "--annotate", name, "--message", message)
+
+    def branch_exists(self, name: str) -> bool:
+        return self._git_ok("rev-parse", "--verify", f"refs/heads/{name}")
+
+    def branch_tip(self, name: str) -> str:
+        tip, _ = self._git("rev-parse", f"refs/heads/{name}")
+        return tip
+
+    def is_ancestor(self, commit: str, of: str) -> bool:
+        return self._git_ok("merge-base", "--is-ancestor", commit, of)
+
+    def create_branch(self, name: str) -> None:
+        self._git("branch", name)
+
+    def fast_forward_branch(self, name: str) -> None:
+        self._git("branch", "-f", name, "HEAD")
 
 
 class VersionBumper:
@@ -291,6 +311,19 @@ def rolling_release(*, yes: bool = False) -> None:
 
     info("[COMMIT] Creating post-release bump commit: x.y.z -> x.y.next-dev0")
     bumper.bump_to_next_dev()
+
+    major, minor, _ = Version(current_version).release
+    branch = f"{major}.{minor}"
+    if not repo.branch_exists(branch):
+        repo.create_branch(branch)
+        info(f"[BRANCH] Created backport branch: {branch}")
+    elif repo.is_ancestor(repo.branch_tip(branch), "HEAD"):
+        repo.fast_forward_branch(branch)
+        info(f"[BRANCH] Fast-forwarded {branch} to HEAD")
+    else:
+        info(
+            f"[BRANCH] Backport branch {branch} already exists and has diverged, skipping"
+        )
 
     info("[COMMIT] Done.")
 
