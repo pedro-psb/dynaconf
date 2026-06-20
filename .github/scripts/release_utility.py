@@ -19,6 +19,7 @@ import urllib.request
 from packaging.version import InvalidVersion
 from packaging.version import Version
 
+BUMP_FILES = ["CHANGELOG.md", "dynaconf/VERSION", "mkdocs.yml", "pyproject.toml"]
 REPO_URL = "https://github.com/pedro-psb/dynaconf.git"  # was dynaconf/dynaconf
 PYPI_URL = "https://test.pypi.org/pypi/dynaconf/json"  # was pypi.org
 RUNNING_CI = bool(os.getenv("CI"))
@@ -183,6 +184,110 @@ class VersionBumper:
         self._bmv("bump", "patch", "--commit")
 
 
+def run(args: argparse.Namespace) -> None:
+    if args.command == "validate":
+        validate(args.version, publish=args.publish)
+    elif args.command == "rolling-release":
+        rolling_release(yes=args.yes)
+    elif args.command == "backport-release":
+        raise NotImplementedError("backport-release is not yet implemented")
+
+
+def validate(expected: str, *, publish: bool = False) -> None:
+    repo = Repository()
+    run_from_root(repo)
+
+    pypi_versions = fetch_pypi_versions()
+    remote_tags = repo.remote_version_tags(REPO_URL)
+    latest_remote_tag = max(remote_tags, key=Version)
+    calculated = VersionBumper().calculated_next()
+
+    debug("mode", "publish" if publish else "release")
+    debug("running_ci", RUNNING_CI)
+    debug("next_version", calculated)
+    debug("expected", expected)
+    debug("repo_url", REPO_URL)
+    debug("pypi_url", PYPI_URL)
+    debug("latest_remote_tag", latest_remote_tag)
+
+    if publish:
+        # Publish mode: checked out at master with full history.
+        # Tag is already on the remote; PyPI publish has not happened yet.
+
+        check_version_format(expected)
+        check_tag_exists_on_remote(repo, expected)
+        prior_tags = [t for t in remote_tags if t != expected]
+        check_is_contiguous(expected, prior_tags)
+
+        # PyPI
+        check_is_unique(expected, pypi_versions)
+        check_is_contiguous(expected, pypi_versions)
+    else:
+        # Release mode: full pre-flight before creating the release commit.
+        # Local state
+        check_on_release_branch(repo)
+        check_version_matches_expected(calculated, expected)
+        check_clean_working_tree(repo)
+        if not RUNNING_CI:
+            check_no_local_tag(repo, expected)
+            check_in_sync_with_upstream(repo)
+        check_has_unreleased_commits(repo, latest_remote_tag)
+        check_version_format(expected)
+
+        # PyPI
+        check_is_unique(expected, pypi_versions)
+        check_is_contiguous(expected, pypi_versions)
+
+        # Remote VCS tags
+        check_is_unique(expected, remote_tags)
+        check_is_contiguous(expected, remote_tags)
+
+    info(f"[OK] Release {expected!r} passed all validation checks.")
+
+
+def rolling_release(*, yes: bool = False) -> None:
+    """Bump version, update changelog, create release commit + tag, then post-release bump."""
+    repo = Repository()
+    bumper = VersionBumper()
+    run_from_root(repo)
+
+    previous = max(repo.local_version_tags(), key=Version)
+    next_version = bumper.calculated_next()
+    info(f"Previous release : {previous}")
+    info(f"Next release     : {next_version}")
+
+    if not yes:
+        answer = input("Type 'yes' to confirm: ")
+        if answer.strip().lower() != "yes":
+            print("[ABORTED] Release cancelled.", file=sys.stderr)  # noqa: T201
+            sys.exit(2)
+
+    info("[BUMP] Bumping version files: x.y.z-dev0 -> x.y.z")
+    current_version = bumper.bump_to_release()
+
+    info(f"[BUMP] Updating changelog for {current_version}")
+    update_changelog(current_version)
+    repo.stage(BUMP_FILES)
+    shortlog = repo.shortlog_since(previous, indent=4)
+    today = datetime.date.today().isoformat()
+    name, email = repo.user_identity()
+
+    info(f"[COMMIT] Creating release commit for {current_version}")
+    repo.commit(
+        f"chore: bump version to {current_version}",
+        "Shortlog of commits since last release:",
+        shortlog,
+    )
+    repo.create_tag(
+        current_version, f"Released in {today} by {name} <{email}>"
+    )
+
+    info("[COMMIT] Creating post-release bump commit: x.y.z -> x.y.next-dev0")
+    bumper.bump_to_next_dev()
+
+    info("[COMMIT] Done.")
+
+
 def update_changelog(version: str) -> None:
     subprocess.run(
         ["git-changelog", "--in-place", "--bump", version], check=True
@@ -337,106 +442,6 @@ def run_from_root(repo: Repository) -> None:
     os.chdir(repo.root())
 
 
-def create_release_commits(*, yes: bool = False) -> None:
-    """Bump version, update changelog, create release commit + tag, then post-release bump."""
-    repo = Repository()
-    bumper = VersionBumper()
-    run_from_root(repo)
-
-    previous = max(repo.local_version_tags(), key=Version)
-    next_version = bumper.calculated_next()
-    info(f"Previous release : {previous}")
-    info(f"Next release     : {next_version}")
-
-    if not yes:
-        answer = input("Type 'yes' to confirm: ")
-        if answer.strip().lower() != "yes":
-            print("[ABORTED] Release cancelled.", file=sys.stderr)  # noqa: T201
-            sys.exit(0)
-
-    info("[BUMP] Bumping version files: x.y.z-dev0 -> x.y.z")
-    current_version = bumper.bump_to_release()
-
-    info(f"[BUMP] Updating changelog for {current_version}")
-    update_changelog(current_version)
-
-    repo.stage(
-        ["CHANGELOG.md", "dynaconf/VERSION", "mkdocs.yml", "pyproject.toml"]
-    )
-
-    shortlog = repo.shortlog_since(previous, indent=4)
-
-    today = datetime.date.today().isoformat()
-    name, email = repo.user_identity()
-
-    info(f"[COMMIT] Creating release commit for {current_version}")
-    repo.commit(
-        f"chore: bump version to {current_version}",
-        "Shortlog of commits since last release:",
-        shortlog,
-    )
-    repo.create_tag(
-        current_version, f"Released in {today} by {name} <{email}>"
-    )
-
-    info("[COMMIT] Creating post-release bump commit: x.y.z -> x.y.next-dev0")
-    bumper.bump_to_next_dev()
-
-    info("[COMMIT] Done.")
-
-
-def main(expected: str, *, publish: bool = False) -> None:
-    repo = Repository()
-    run_from_root(repo)
-
-    pypi_versions = fetch_pypi_versions()
-    remote_tags = repo.remote_version_tags(REPO_URL)
-    latest_remote_tag = max(remote_tags, key=Version)
-    calculated = VersionBumper().calculated_next()
-
-    debug("mode", "publish" if publish else "release")
-    debug("running_ci", RUNNING_CI)
-    debug("next_version", calculated)
-    debug("expected", expected)
-    debug("repo_url", REPO_URL)
-    debug("pypi_url", PYPI_URL)
-    debug("latest_remote_tag", latest_remote_tag)
-
-    if publish:
-        # Publish mode: checked out at master with full history.
-        # Tag is already on the remote; PyPI publish has not happened yet.
-
-        check_version_format(expected)
-        check_tag_exists_on_remote(repo, expected)
-        prior_tags = [t for t in remote_tags if t != expected]
-        check_is_contiguous(expected, prior_tags)
-
-        # PyPI
-        check_is_unique(expected, pypi_versions)
-        check_is_contiguous(expected, pypi_versions)
-    else:
-        # Release mode: full pre-flight before creating the release commit.
-        # Local state
-        check_on_release_branch(repo)
-        check_version_matches_expected(calculated, expected)
-        check_clean_working_tree(repo)
-        if not RUNNING_CI:
-            check_no_local_tag(repo, expected)
-            check_in_sync_with_upstream(repo)
-        check_has_unreleased_commits(repo, latest_remote_tag)
-        check_version_format(expected)
-
-        # PyPI
-        check_is_unique(expected, pypi_versions)
-        check_is_contiguous(expected, pypi_versions)
-
-        # Remote VCS tags
-        check_is_unique(expected, remote_tags)
-        check_is_contiguous(expected, remote_tags)
-
-    info(f"[OK] Release {expected!r} passed all validation checks.")
-
-
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=HELP_FORMATTER
@@ -481,15 +486,6 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     return parser
-
-
-def run(args: argparse.Namespace) -> None:
-    if args.command == "validate":
-        main(args.version, publish=args.publish)
-    elif args.command == "rolling-release":
-        create_release_commits(yes=args.yes)
-    elif args.command == "backport-release":
-        raise NotImplementedError("backport-release is not yet implemented")
 
 
 if __name__ == "__main__":
