@@ -2,6 +2,21 @@ Changelog
 =========
 
 <!-- insertion marker -->
+## [3.3.3](https://github.com/pedro-psb/dynaconf/releases/tag/3.3.3) - 2026-06-20
+
+### Bug Fixes
+
+- ensure workflow push pushes master, tag and backport branch create/update. *By Pedro Brochado*.
+- check that can't release x.y.z+ if X.Y backport branch diverged. *By Pedro Brochado*.
+
+### Features
+
+- add automatic backport branch creation and ff. *By Pedro Brochado*.
+
+### Chore
+
+- bump version to 3.3.3-dev0. *By Pedro Brochado*.
+
 ## [3.3.2](https://github.com/pedro-psb/dynaconf/releases/tag/3.3.2) - 2026-06-20
 
 ### Bug Fixes
