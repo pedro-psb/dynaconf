@@ -179,8 +179,10 @@ class Repository:
     def create_branch(self, name: str) -> None:
         self._git("branch", name)
 
-    def fast_forward_branch(self, name: str) -> None:
-        self._git("branch", "-f", name, "HEAD")
+    def fast_forward_branch(self, name: str, expected_tip: str) -> None:
+        # update-ref is atomic: fails if the branch tip moved since we checked,
+        # unlike `branch -f` which would silently overwrite any intervening change.
+        self._git("update-ref", f"refs/heads/{name}", "HEAD", expected_tip)
 
 
 class VersionBumper:
@@ -318,8 +320,8 @@ def rolling_release(*, yes: bool = False) -> None:
     if not repo.branch_exists(branch):
         repo.create_branch(branch)
         info(f"[BRANCH] Created backport branch: {branch}")
-    elif repo.is_ancestor(repo.branch_tip(branch), "HEAD"):
-        repo.fast_forward_branch(branch)
+    elif repo.is_ancestor(tip := repo.branch_tip(branch), "HEAD"):
+        repo.fast_forward_branch(branch, tip)
         info(f"[BRANCH] Fast-forwarded {branch} to HEAD")
     else:
         info(
