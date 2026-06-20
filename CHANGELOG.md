@@ -2,6 +2,12 @@ Changelog
 =========
 
 <!-- insertion marker -->
+## [3.3.2](https://github.com/pedro-psb/dynaconf/releases/tag/3.3.2) - 2026-06-20
+
+### Bug Fixes
+
+- fix post-release and release commit messages. *By Pedro Brochado*.
+
 ## [3.3.1](https://github.com/pedro-psb/dynaconf/releases/tag/3.3.1) - 2026-06-20
 
 ## [3.3.0](https://github.com/pedro-psb/dynaconf/releases/tag/3.3.0) - 2026-06-19
