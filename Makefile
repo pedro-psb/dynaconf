@@ -84,15 +84,15 @@ bump-minor:
 	bump-my-version bump minor
 
 # Release
-# Usage: make release VERSION=x.y.z
-# Validates the expected version, then creates the release and post-release commits.
+# Usage: make release
+# Validates, creates release commits, tags, and bumps to next dev version.
 # Push is handled by the CI workflow.
 release:
 	@if [ -z "$(VERSION)" ]; then echo "Error: VERSION is required. Usage: make release VERSION=x.y.z"; exit 1; fi
 	# $(MAKE) run-pre-commit
 	# $(MAKE) test_only
 	uv run python .github/scripts/release_utility.py validate "$(VERSION)"
-	bash .github/scripts/create-release-commit.sh
+	uv run python .github/scripts/release_utility.py rolling-release -y
 
 # Publish
 # 1. Publish to PiPY
