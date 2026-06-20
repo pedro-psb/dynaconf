@@ -19,7 +19,13 @@ import urllib.request
 from packaging.version import InvalidVersion
 from packaging.version import Version
 
-BUMP_FILES = ["CHANGELOG.md", "dynaconf/VERSION", "mkdocs.yml", "pyproject.toml"]
+BUMP_FILES = [
+    "CHANGELOG.md",
+    "dynaconf/VERSION",
+    "mkdocs.yml",
+    "pyproject.toml",
+]
+RELEASE_COMMIT_MSG = "Release version {version}"
 REPO_URL = "https://github.com/pedro-psb/dynaconf.git"  # was dynaconf/dynaconf
 PYPI_URL = "https://test.pypi.org/pypi/dynaconf/json"  # was pypi.org
 RUNNING_CI = bool(os.getenv("CI"))
@@ -255,6 +261,7 @@ def rolling_release(*, yes: bool = False) -> None:
     next_version = bumper.calculated_next()
     info(f"Previous release : {previous}")
     info(f"Next release     : {next_version}")
+    validate(next_version)
 
     if not yes:
         answer = input("Type 'yes' to confirm: ")
@@ -274,7 +281,7 @@ def rolling_release(*, yes: bool = False) -> None:
 
     info(f"[COMMIT] Creating release commit for {current_version}")
     repo.commit(
-        f"chore: bump version to {current_version}",
+        RELEASE_COMMIT_MSG.format(version=current_version),
         "Shortlog of commits since last release:",
         shortlog,
     )
