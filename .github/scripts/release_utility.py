@@ -32,70 +32,62 @@ class InvalidReleaseError(Exception):
 HELP_FORMATTER = argparse.RawDescriptionHelpFormatter
 
 
-def _log(label: str, value: object) -> None:
+def debug(label: str, value: object) -> None:
     print(f"[DEBUG] {label}: {value}", file=sys.stderr)  # noqa: T201
+
+
+def info(msg: str) -> None:
+    print(msg)  # noqa: T201
 
 
 class Repository:
     """Git repository introspection."""
 
+    def _git(self, *args) -> tuple[str, str]:
+        result = subprocess.run(
+            ["git", *args], check=True, capture_output=True, text=True
+        )
+        return result.stdout.strip(), result.stderr.strip()
+
     def current_branch(self) -> str:
         # --abbrev-ref resolves HEAD to the short branch name (e.g. "master").
         # In detached HEAD state it returns the literal string "HEAD".
-        result = subprocess.check_output(
-            ["git", "rev-parse", "--abbrev-ref", "HEAD"], text=True
-        ).strip()
-        _log("current_branch", result)
+        result, _ = self._git("rev-parse", "--abbrev-ref", "HEAD")
+        debug("current_branch", result)
         return result
 
     def root(self) -> str:
         # --show-toplevel always returns an absolute path regardless of which
         # subdirectory the process was launched from.
-        result = subprocess.check_output(
-            ["git", "rev-parse", "--show-toplevel"], text=True
-        ).strip()
-        _log("root", result)
+        result, _ = self._git("rev-parse", "--show-toplevel")
+        debug("root", result)
         return result
 
     def working_tree_status(self) -> str:
         # --porcelain is a stable machine-readable format that is unaffected by
         # locale or git version. Empty output means the tree is clean.
-        result = subprocess.check_output(
-            ["git", "status", "--porcelain"], text=True
-        )
-        _log(
-            "working_tree_status",
-            repr(result.strip()) if result.strip() else "clean",
-        )
+        result, _ = self._git("status", "--porcelain")
+        debug("working_tree_status", repr(result) if result else "clean")
         return result
 
     def sync_counts(self, url: str) -> tuple[int, int]:
         """Return (ahead, behind) commit counts relative to the remote master."""
         # Fetch by URL, not by remote name, so this works regardless of how
         # the user has their remotes configured.
-        subprocess.run(
-            ["git", "fetch", url, "master"], check=True, capture_output=True
-        )
+        self._git("fetch", url, "master")
         # FETCH_HEAD is always written by the fetch above, so these counts
         # reflect exactly what was just fetched — no stale remote-tracking ref.
-        ahead = int(
-            subprocess.check_output(
-                ["git", "rev-list", "--count", "FETCH_HEAD..HEAD"], text=True
-            ).strip()
-        )
-        behind = int(
-            subprocess.check_output(
-                ["git", "rev-list", "--count", "HEAD..FETCH_HEAD"], text=True
-            ).strip()
-        )
-        _log("sync_counts", f"ahead={ahead}, behind={behind}")
+        ahead_out, _ = self._git("rev-list", "--count", "FETCH_HEAD..HEAD")
+        behind_out, _ = self._git("rev-list", "--count", "HEAD..FETCH_HEAD")
+        ahead, behind = int(ahead_out), int(behind_out)
+        debug("sync_counts", f"ahead={ahead}, behind={behind}")
         return ahead, behind
 
     def local_version_tags(self) -> list[str]:
         # git tag emits one exact tag name per line with no decorations,
         # so splitting on newlines gives a precise list for membership checks.
         # Non-version tags (e.g. "list", "latest") are silently skipped.
-        output = subprocess.check_output(["git", "tag", "--list"], text=True)
+        output, _ = self._git("tag", "--list")
         tags = []
         for tag in output.splitlines():
             try:
@@ -103,16 +95,14 @@ class Repository:
                 tags.append(tag)
             except InvalidVersion:
                 pass
-        _log("local_version_tags", sorted(tags, key=Version))
+        debug("local_version_tags", sorted(tags, key=Version))
         return tags
 
     def remote_version_tags(self, url: str) -> list[str]:
         # Queries the remote directly over the git protocol without touching
         # any local clone state, so the result always reflects the server.
         # Non-version tags are silently skipped.
-        output = subprocess.check_output(
-            ["git", "ls-remote", "--tags", url], text=True
-        )
+        output, _ = self._git("ls-remote", "--tags", url)
         tags = []
         no_version_tags = []
         for line in output.splitlines():
@@ -126,37 +116,77 @@ class Repository:
             except InvalidVersion:
                 no_version_tags.append(tag)
                 pass
-        _log("remote_not_version_tags", sorted(no_version_tags))
-        _log("remote_version_tags", sorted(tags, key=Version))
+        debug("remote_not_version_tags", sorted(no_version_tags))
+        debug("remote_version_tags", sorted(tags, key=Version))
         return tags
 
     def commits_since_tag(self, tag: str) -> list[str]:
         # --format=%H emits one bare hash per line with no decorations,
         # making it locale-independent and stable across git versions.
         # Empty output (tag at HEAD) correctly produces an empty list.
-        output = subprocess.check_output(
-            ["git", "log", f"{tag}..HEAD", "--format=%H"], text=True
-        )
+        output, _ = self._git("log", f"{tag}..HEAD", "--format=%H")
         result = output.splitlines()
-        _log("commits_since_tag", result)
+        debug("commits_since_tag", result)
         return result
 
+    def stage(self, files: list[str]) -> None:
+        self._git("add", *files)
 
-# Version calculation
+    def shortlog_since(self, tag: str, indent: int = 0) -> str:
+        output, _ = self._git("shortlog", f"{tag}..")
+        if not indent:
+            return output
+        prefix = " " * indent
+        return "\n".join(
+            f"{prefix}{line}" if line else "" for line in output.splitlines()
+        )
+
+    def user_identity(self) -> tuple[str, str]:
+        name, _ = self._git("config", "user.name")
+        email, _ = self._git("config", "user.email")
+        return name, email
+
+    def commit(self, *messages: str) -> None:
+        args = ["commit"]
+        for msg in messages:
+            args += ["--message", msg]
+        self._git(*args)
+
+    def create_tag(self, name: str, message: str) -> None:
+        self._git("tag", "--annotate", name, "--message", message)
 
 
-def get_calculated_next_version() -> str:
-    """Return the next release version as computed from the current branch state.
+class VersionBumper:
+    """Wraps bump-my-version calls."""
 
-    Reads the dev version (e.g. 3.3.0-dev0) via bump-my-version and returns
-    the release version it would produce (e.g. 3.3.0).
-    """
-    result = subprocess.check_output(
-        ["bump-my-version", "show", "--increment", "pre", "new_version"],
-        text=True,
-    ).strip()
-    _log("calculated_next_version", result)
-    return result
+    def _bmv(self, *args) -> tuple[str, str]:
+        result = subprocess.run(
+            ["bump-my-version", *args],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        return result.stdout.strip(), result.stderr.strip()
+
+    def calculated_next(self) -> str:
+        result, _ = self._bmv("show", "--increment", "pre", "new_version")
+        debug("calculated_next_version", result)
+        return result
+
+    def bump_to_release(self) -> str:
+        """Bump dev -> release and return the new version string."""
+        self._bmv("bump", "pre")
+        version, _ = self._bmv("show", "current_version")
+        return version
+
+    def bump_to_next_dev(self) -> None:
+        self._bmv("bump", "patch", "--commit")
+
+
+def update_changelog(version: str) -> None:
+    subprocess.run(
+        ["git-changelog", "--in-place", "--bump", version], check=True
+    )
 
 
 def check_version_format(version: str) -> None:
@@ -197,7 +227,7 @@ def fetch_pypi_versions() -> list[str]:
             f"failed to fetch PyPI versions from {PYPI_URL!r}: {e}"
         ) from e
     result = list(data["releases"].keys())
-    _log("pypi_versions", sorted(result, key=Version))
+    debug("pypi_versions", sorted(result, key=Version))
     return result
 
 
@@ -299,7 +329,7 @@ def check_has_unreleased_commits(repo: Repository, latest_tag: str) -> None:
 def check_clean_working_tree(repo: Repository) -> None:
     """Raise if the working tree has any staged, unstaged, or untracked changes."""
     status = repo.working_tree_status()
-    if status.strip():
+    if status:
         raise InvalidReleaseError(f"working tree is not clean:\n{status}")
 
 
@@ -310,12 +340,13 @@ def run_from_root(repo: Repository) -> None:
 def create_release_commits(*, yes: bool = False) -> None:
     """Bump version, update changelog, create release commit + tag, then post-release bump."""
     repo = Repository()
+    bumper = VersionBumper()
     run_from_root(repo)
 
     previous = max(repo.local_version_tags(), key=Version)
-    next_version = get_calculated_next_version()
-    print(f"Previous release : {previous}")  # noqa: T201
-    print(f"Next release     : {next_version}")  # noqa: T201
+    next_version = bumper.calculated_next()
+    info(f"Previous release : {previous}")
+    info(f"Next release     : {next_version}")
 
     if not yes:
         answer = input("Type 'yes' to confirm: ")
@@ -323,83 +354,35 @@ def create_release_commits(*, yes: bool = False) -> None:
             print("[ABORTED] Release cancelled.", file=sys.stderr)  # noqa: T201
             sys.exit(0)
 
-    # Bump version files: x.y.z-dev0 -> x.y.z
-    print("[BUMP] Bumping version files: x.y.z-dev0 -> x.y.z")  # noqa: T201
-    subprocess.run(["bump-my-version", "bump", "pre"], check=True)
+    info("[BUMP] Bumping version files: x.y.z-dev0 -> x.y.z")
+    current_version = bumper.bump_to_release()
 
-    current_version = subprocess.check_output(
-        ["bump-my-version", "show", "current_version"], text=True
-    ).strip()
+    info(f"[BUMP] Updating changelog for {current_version}")
+    update_changelog(current_version)
 
-    print(f"[BUMP] Updating changelog for {current_version}")  # noqa: T201
-    subprocess.run(
-        ["git-changelog", "--in-place", "--bump", current_version], check=True
+    repo.stage(
+        ["CHANGELOG.md", "dynaconf/VERSION", "mkdocs.yml", "pyproject.toml"]
     )
 
-    # Stage all files modified by the bump and changelog update
-    subprocess.run(
-        [
-            "git",
-            "add",
-            "CHANGELOG.md",
-            "dynaconf/VERSION",
-            "mkdocs.yml",
-            "pyproject.toml",
-        ],
-        check=True,
-    )
-
-    # Build commit message body from shortlog since the last tag
-    latest_tag = subprocess.check_output(
-        ["git", "describe", "--tags", "--abbrev=0"], text=True
-    ).strip()
-    shortlog = subprocess.check_output(
-        ["git", "shortlog", f"{latest_tag}.."], text=True
-    )
-    indented = "\n".join(
-        f"    {line}" if line else "" for line in shortlog.splitlines()
-    )
+    shortlog = repo.shortlog_since(previous, indent=4)
 
     today = datetime.date.today().isoformat()
-    user_name = subprocess.check_output(
-        ["git", "config", "user.name"], text=True
-    ).strip()
-    user_email = subprocess.check_output(
-        ["git", "config", "user.email"], text=True
-    ).strip()
+    name, email = repo.user_identity()
 
-    print(f"[COMMIT] Creating release commit for {current_version}")  # noqa: T201
-    subprocess.run(
-        [
-            "git",
-            "commit",
-            "--message",
-            f"chore: bump version to {current_version}",
-            "--message",
-            "Shortlog of commits since last release:",
-            "--message",
-            indented,
-        ],
-        check=True,
+    info(f"[COMMIT] Creating release commit for {current_version}")
+    repo.commit(
+        f"chore: bump version to {current_version}",
+        "Shortlog of commits since last release:",
+        shortlog,
     )
-    subprocess.run(
-        [
-            "git",
-            "tag",
-            "--annotate",
-            current_version,
-            "--message",
-            f"Released in {today} by {user_name} <{user_email}>",
-        ],
-        check=True,
+    repo.create_tag(
+        current_version, f"Released in {today} by {name} <{email}>"
     )
 
-    print("[COMMIT] Creating post-release bump commit: x.y.z -> x.y.next-dev0")  # noqa: T201
-    subprocess.run(
-        ["bump-my-version", "bump", "patch", "--commit"], check=True
-    )
+    info("[COMMIT] Creating post-release bump commit: x.y.z -> x.y.next-dev0")
+    bumper.bump_to_next_dev()
 
-    print("[COMMIT] Done.")  # noqa: T201
+    info("[COMMIT] Done.")
 
 
 def main(expected: str, *, publish: bool = False) -> None:
@@ -409,15 +392,15 @@ def main(expected: str, *, publish: bool = False) -> None:
     pypi_versions = fetch_pypi_versions()
     remote_tags = repo.remote_version_tags(REPO_URL)
     latest_remote_tag = max(remote_tags, key=Version)
-    calculated = get_calculated_next_version()
+    calculated = VersionBumper().calculated_next()
 
-    _log("mode", "publish" if publish else "release")
-    _log("running_ci", RUNNING_CI)
-    _log("next_version", calculated)
-    _log("expected", expected)
-    _log("repo_url", REPO_URL)
-    _log("pypi_url", PYPI_URL)
-    _log("latest_remote_tag", latest_remote_tag)
+    debug("mode", "publish" if publish else "release")
+    debug("running_ci", RUNNING_CI)
+    debug("next_version", calculated)
+    debug("expected", expected)
+    debug("repo_url", REPO_URL)
+    debug("pypi_url", PYPI_URL)
+    debug("latest_remote_tag", latest_remote_tag)
 
     if publish:
         # Publish mode: checked out at master with full history.
@@ -451,7 +434,7 @@ def main(expected: str, *, publish: bool = False) -> None:
         check_is_unique(expected, remote_tags)
         check_is_contiguous(expected, remote_tags)
 
-    print(f"[OK] Release {expected!r} passed all validation checks.")  # noqa: T201
+    info(f"[OK] Release {expected!r} passed all validation checks.")
 
 
 def build_parser() -> argparse.ArgumentParser:
