@@ -1,20 +1,14 @@
 #!/usr/bin/env python3
 """
-Release validation script.
-
-Checks before creating a release commit:
-1. The version calculated from the current branch matches the expected version.
-2. The expected version does not already exist in PyPI or the remote VCS tags.
-3. The expected version is contiguous to the latest release in PyPI and VCS tags.
-
-Usage:
-    python validate-release.py <expected-version>
+Release utility for dynaconf.
 
 Exit codes:
-    0 — all checks passed
-    1 — one or more checks failed
+    0 — success
+    1 — one or more checks failed or a step errored
 """
 
+import argparse
+import datetime
 import json
 import os
 import subprocess
@@ -32,6 +26,10 @@ RUNNING_CI = bool(os.getenv("CI"))
 
 class InvalidReleaseError(Exception):
     pass
+
+
+# Keep line breaks on the help display
+HELP_FORMATTER = argparse.RawDescriptionHelpFormatter
 
 
 def _log(label: str, value: object) -> None:
@@ -105,7 +103,7 @@ class Repository:
                 tags.append(tag)
             except InvalidVersion:
                 pass
-        _log("local_version_tags", tags)
+        _log("local_version_tags", sorted(tags, key=Version))
         return tags
 
     def remote_version_tags(self, url: str) -> list[str]:
@@ -128,8 +126,8 @@ class Repository:
             except InvalidVersion:
                 no_version_tags.append(tag)
                 pass
-        _log("remote_not_version_tags", no_version_tags)
-        _log("remote_version_tags", tags)
+        _log("remote_not_version_tags", sorted(no_version_tags))
+        _log("remote_version_tags", sorted(tags, key=Version))
         return tags
 
     def commits_since_tag(self, tag: str) -> list[str]:
@@ -199,7 +197,7 @@ def fetch_pypi_versions() -> list[str]:
             f"failed to fetch PyPI versions from {PYPI_URL!r}: {e}"
         ) from e
     result = list(data["releases"].keys())
-    _log("pypi_versions", result)
+    _log("pypi_versions", sorted(result, key=Version))
     return result
 
 
@@ -309,6 +307,101 @@ def run_from_root(repo: Repository) -> None:
     os.chdir(repo.root())
 
 
+def create_release_commits(*, yes: bool = False) -> None:
+    """Bump version, update changelog, create release commit + tag, then post-release bump."""
+    repo = Repository()
+    run_from_root(repo)
+
+    previous = max(repo.local_version_tags(), key=Version)
+    next_version = get_calculated_next_version()
+    print(f"Previous release : {previous}")  # noqa: T201
+    print(f"Next release     : {next_version}")  # noqa: T201
+
+    if not yes:
+        answer = input("Type 'yes' to confirm: ")
+        if answer.strip().lower() != "yes":
+            print("[ABORTED] Release cancelled.", file=sys.stderr)  # noqa: T201
+            sys.exit(0)
+
+    # Bump version files: x.y.z-dev0 -> x.y.z
+    print("[BUMP] Bumping version files: x.y.z-dev0 -> x.y.z")  # noqa: T201
+    subprocess.run(["bump-my-version", "bump", "pre"], check=True)
+
+    current_version = subprocess.check_output(
+        ["bump-my-version", "show", "current_version"], text=True
+    ).strip()
+
+    print(f"[BUMP] Updating changelog for {current_version}")  # noqa: T201
+    subprocess.run(
+        ["git-changelog", "--in-place", "--bump", current_version], check=True
+    )
+
+    # Stage all files modified by the bump and changelog update
+    subprocess.run(
+        [
+            "git",
+            "add",
+            "CHANGELOG.md",
+            "dynaconf/VERSION",
+            "mkdocs.yml",
+            "pyproject.toml",
+        ],
+        check=True,
+    )
+
+    # Build commit message body from shortlog since the last tag
+    latest_tag = subprocess.check_output(
+        ["git", "describe", "--tags", "--abbrev=0"], text=True
+    ).strip()
+    shortlog = subprocess.check_output(
+        ["git", "shortlog", f"{latest_tag}.."], text=True
+    )
+    indented = "\n".join(
+        f"    {line}" if line else "" for line in shortlog.splitlines()
+    )
+
+    today = datetime.date.today().isoformat()
+    user_name = subprocess.check_output(
+        ["git", "config", "user.name"], text=True
+    ).strip()
+    user_email = subprocess.check_output(
+        ["git", "config", "user.email"], text=True
+    ).strip()
+
+    print(f"[COMMIT] Creating release commit for {current_version}")  # noqa: T201
+    subprocess.run(
+        [
+            "git",
+            "commit",
+            "--message",
+            f"chore: bump version to {current_version}",
+            "--message",
+            "Shortlog of commits since last release:",
+            "--message",
+            indented,
+        ],
+        check=True,
+    )
+    subprocess.run(
+        [
+            "git",
+            "tag",
+            "--annotate",
+            current_version,
+            "--message",
+            f"Released in {today} by {user_name} <{user_email}>",
+        ],
+        check=True,
+    )
+
+    print("[COMMIT] Creating post-release bump commit: x.y.z -> x.y.next-dev0")  # noqa: T201
+    subprocess.run(
+        ["bump-my-version", "bump", "patch", "--commit"], check=True
+    )
+
+    print("[COMMIT] Done.")  # noqa: T201
+
+
 def main(expected: str, *, publish: bool = False) -> None:
     repo = Repository()
     run_from_root(repo)
@@ -361,15 +454,16 @@ def main(expected: str, *, publish: bool = False) -> None:
     print(f"[OK] Release {expected!r} passed all validation checks.")  # noqa: T201
 
 
-if __name__ == "__main__":
-    import argparse
-    import sys
-
-    parser = argparse.ArgumentParser(description=__doc__)
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=HELP_FORMATTER
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     validate_parser = subparsers.add_parser(
-        "validate", help="Validate a release before or after tagging"
+        "validate",
+        help="Validate a release before or after tagging",
+        formatter_class=HELP_FORMATTER,
     )
     validate_parser.add_argument(
         "version", help="Expected release version (e.g. 3.3.0)"
@@ -380,9 +474,48 @@ if __name__ == "__main__":
         help="Run publish-mode checks (tag already on remote, not yet on PyPI)",
     )
 
-    args = parser.parse_args()
-    try:
+    rolling_parser = subparsers.add_parser(
+        "rolling-release",
+        help="Cut a VCS/git tagged release from whatever version is on main (no PyPI publish)",
+        description=(
+            "Cut a VCS/git tagged release from whatever version is currently on main.\n\n"
+            "Does not publish to PyPI. Steps: bump dev -> release, update changelog, "
+            "commit, tag, then bump to next dev."
+        ),
+        formatter_class=HELP_FORMATTER,
+    )
+    rolling_parser.add_argument(
+        "-y",
+        "--yes",
+        action="store_true",
+        help="Skip confirmation prompt",
+    )
+
+    subparsers.add_parser(
+        "backport-release",
+        help="Cut a backport release from a maintenance branch (not yet implemented)",
+        formatter_class=HELP_FORMATTER,
+    )
+
+    return parser
+
+
+def run(args: argparse.Namespace) -> None:
+    if args.command == "validate":
         main(args.version, publish=args.publish)
+    elif args.command == "rolling-release":
+        create_release_commits(yes=args.yes)
+    elif args.command == "backport-release":
+        raise NotImplementedError("backport-release is not yet implemented")
+
+
+if __name__ == "__main__":
+    _args = build_parser().parse_args()
+    try:
+        run(_args)
     except InvalidReleaseError as e:
         print(f"[ERROR] {e}", file=sys.stderr)  # noqa: T201
         sys.exit(1)
+    except Exception as e:
+        print(f"[ERROR] {e}", file=sys.stderr)  # noqa: T201
+        sys.exit(2)
