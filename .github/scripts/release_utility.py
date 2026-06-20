@@ -366,14 +366,20 @@ if __name__ == "__main__":
     import sys
 
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    validate_parser = subparsers.add_parser(
+        "validate", help="Validate a release before or after tagging"
+    )
+    validate_parser.add_argument(
         "version", help="Expected release version (e.g. 3.3.0)"
     )
-    parser.add_argument(
+    validate_parser.add_argument(
         "--publish",
         action="store_true",
-        help="Skip local git pre-flight checks (use when validating before publishing)",
+        help="Run publish-mode checks (tag already on remote, not yet on PyPI)",
     )
+
     args = parser.parse_args()
     try:
         main(args.version, publish=args.publish)

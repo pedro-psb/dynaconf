@@ -27,7 +27,7 @@ jobs:
       - name: Install release tools
         run: uv sync --only-group release
       - name: Validate release
-        run: uv run python .github/scripts/validate_release.py --publish "${{ inputs.release-tag || github.ref_name }}"
+        run: uv run python .github/scripts/release_utility.py validate --publish "${{ inputs.release-tag || github.ref_name }}"
 
   build-dist:
     name: "Build distribution"

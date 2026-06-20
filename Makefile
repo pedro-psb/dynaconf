@@ -91,7 +91,7 @@ release:
 	@if [ -z "$(VERSION)" ]; then echo "Error: VERSION is required. Usage: make release VERSION=x.y.z"; exit 1; fi
 	# $(MAKE) run-pre-commit
 	# $(MAKE) test_only
-	uv run python .github/scripts/validate_release.py "$(VERSION)"
+	uv run python .github/scripts/release_utility.py validate "$(VERSION)"
 	bash .github/scripts/create-release-commit.sh
 
 # Publish
