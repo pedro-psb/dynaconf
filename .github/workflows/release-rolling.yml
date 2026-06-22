@@ -59,3 +59,10 @@ jobs:
             master \
             "refs/tags/${{ inputs.expected-release }}" \
             "${{ steps.branch.outputs.name }}"
+
+  publish:
+    name: "Publish"
+    needs: [rolling-release]
+    uses: ./.github/workflows/publish.yml
+    with:
+      release-tag: ${{ inputs.expected-release }}

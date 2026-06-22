@@ -32,6 +32,20 @@ RELEASE_COMMIT_MSG = "Release version {version}"
 REPO_URL = "https://github.com/pedro-psb/dynaconf.git"  # was dynaconf/dynaconf
 PYPI_URL = "https://test.pypi.org/pypi/dynaconf/json"  # was pypi.org
 RUNNING_CI = bool(os.getenv("CI"))
+
+
+def fetch_pypi_versions() -> list[str]:
+    """Return the list of versions published on PyPI for dynaconf."""
+    try:
+        with urllib.request.urlopen(PYPI_URL, timeout=10) as response:
+            data = json.loads(response.read())
+    except urllib.error.HTTPError as e:
+        raise InvalidReleaseError(
+            f"Failed to fetch PyPI versions from {PYPI_URL!r}: {e}"
+        ) from e
+    result = list(data["releases"].keys())
+    debug("pypi_versions", sorted(result, key=Version))
+    return result
 DEFAULT_BRANCH = "master"
 
 
@@ -43,8 +57,12 @@ class InvalidReleaseError(Exception):
 HELP_FORMATTER = argparse.RawDescriptionHelpFormatter
 
 
+_DEBUG = True
+
+
 def debug(label: str, value: object) -> None:
-    print(f"[DEBUG] {label}: {value}", file=sys.stderr)  # noqa: T201
+    if _DEBUG:
+        print(f"[DEBUG] {label}: {value}", file=sys.stderr)  # noqa: T201
 
 
 def info(msg: str) -> None:
@@ -171,8 +189,25 @@ class Repository:
     def is_ancestor(self, commit: str, of: str) -> bool:
         return self._git_ok("merge-base", "--is-ancestor", commit, of)
 
+    def remote_branches(self, url: str, pattern: str = "") -> list[str]:
+        args = ["ls-remote", "--heads", url]
+        if pattern:
+            args.append(pattern)
+        output, _ = self._git(*args)
+        result = []
+        for line in output.splitlines():
+            ref = line.split("\t")[1]
+            result.append(ref.removeprefix("refs/heads/"))
+        return result
+
     def fetch(self, url: str, branch: str) -> None:
         self._git("fetch", url, branch)
+
+    def fetch_branch_tip(self, url: str, branch: str) -> str:
+        """Fetch a remote branch and return its tip commit hash."""
+        self.fetch(url, branch)
+        tip, _ = self._git("rev-parse", "FETCH_HEAD")
+        return tip
 
     # --- write ---
 
@@ -285,24 +320,11 @@ class Releaser(ABC):
         latest_xy = Version(latest).release[:2]
         return "backport" if tag_xy < latest_xy else "rolling"
 
-    @staticmethod
-    def _fetch_pypi_versions() -> list[str]:
-        """Return the list of versions published on PyPI for dynaconf."""
-        try:
-            with urllib.request.urlopen(PYPI_URL, timeout=10) as response:
-                data = json.loads(response.read())
-        except urllib.error.HTTPError as e:
-            raise InvalidReleaseError(
-                f"Failed to fetch PyPI versions from {PYPI_URL!r}: {e}"
-            ) from e
-        result = list(data["releases"].keys())
-        debug("pypi_versions", sorted(result, key=Version))
-        return result
 
 
 class RollingReleaser(Releaser):
     def validate(self, expected: str, *, pre_publish: bool = False) -> None:
-        pypi_versions = self._fetch_pypi_versions()
+        pypi_versions = fetch_pypi_versions()
         remote_tags = self.repo.remote_version_tags(REPO_URL)
 
         debug("mode", "pre_publish" if pre_publish else "release")
@@ -385,7 +407,7 @@ class BackportReleaser(Releaser):
         return list(versions)
 
     def validate(self, expected: str, *, pre_publish: bool = False) -> None:
-        pypi_versions = self._fetch_pypi_versions()
+        pypi_versions = fetch_pypi_versions()
         remote_tags = self.repo.remote_version_tags(REPO_URL)
         major, minor, _ = Version(expected).release
 
@@ -500,8 +522,12 @@ def check_is_contiguous(version: str, released: list[str]) -> None:
         )
 
 
-def check_on_release_branch(repo: Repository) -> None:
-    """Raise if the current branch is not master."""
+def check_on_release_branch(
+    repo: Repository, *, is_backport_release: bool = False
+) -> None:
+    """Raise if the current branch is not the expected release branch."""
+    if is_backport_release:
+        raise NotImplementedError
     branch = repo.current_branch()
     if branch != DEFAULT_BRANCH:
         raise InvalidReleaseError(
@@ -650,6 +676,69 @@ def check_backport_branch_compatible(repo: Repository, version: str) -> None:
         )
 
 
+def check_release_status(repo: Repository) -> None:
+    """Print available releases and unpublished tags."""
+    remote_tags = repo.remote_version_tags(REPO_URL)
+    pypi_versions = fetch_pypi_versions()
+
+    all_remote = repo.remote_branches(REPO_URL, "[0-9]*.[0-9]*")
+    xy_branches = [
+        b for b in all_remote
+        if len(b.split(".")) == 2 and all(p.isdigit() for p in b.split("."))
+    ]
+    branches = ["master"] + sorted(
+        xy_branches, key=lambda b: Version(b + ".0"), reverse=True
+    )[:2]
+    col = max(len(b) for b in branches)
+
+    info("Available releases")
+    for branch in branches:
+        if branch == "master":
+            series = remote_tags
+        else:
+            major, minor = (int(x) for x in branch.split("."))
+            series = [
+                t for t in remote_tags
+                if Version(t).release[:2] == (major, minor)
+            ]
+
+        if not series:
+            info(f"  {branch:<{col}}  —")
+            continue
+
+        latest = max(series, key=Version)
+        tip = repo.fetch_branch_tip(REPO_URL, branch)
+        commits = repo.commits_between(latest, tip)
+        count = len(commits) - 1  # exclude the post-release bump commit
+
+        if count <= 0:
+            info(f"  {branch:<{col}}  —")
+        else:
+            maj, min_, patch = Version(latest).release
+            next_v = f"{maj}.{min_}.{patch + 1}"
+            info(f"  {branch:<{col}}  {next_v}  ({count} commits since {latest})")
+
+    info("")
+    info("Unpublished releases")
+    active_series = {
+        tuple(int(x) for x in b.split(".")) for b in branches if b != "master"
+    }
+    unpublished = sorted(
+        [
+            t for t in remote_tags
+            if t not in pypi_versions
+            and Version(t).release[:2] in active_series
+        ],
+        key=Version,
+        reverse=True,
+    )
+    if unpublished:
+        for tag in unpublished:
+            info(f"  {tag}")
+    else:
+        info("  —")
+
+
 def run_from_root(repo: Repository) -> None:
     os.chdir(repo.root())
 
@@ -730,6 +819,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Tag name (required for release-type)",
     )
 
+    subparsers.add_parser(
+        "check",
+        help="Show available releases and unpublished tags",
+        formatter_class=HELP_FORMATTER,
+    )
+
     return parser
 
 
@@ -745,6 +840,10 @@ def run(args: argparse.Namespace) -> None:
         RollingReleaser(repo, bumper).release(yes=args.yes)
     elif args.command == "backport-release":
         BackportReleaser(repo, bumper).release(yes=args.yes)
+    elif args.command == "check":
+        global _DEBUG
+        _DEBUG = False
+        check_release_status(repo)
     elif args.command == "get":
         if args.item == "backport-branch":
             version = args.value or bumper.calculated_next()
