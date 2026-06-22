@@ -139,13 +139,12 @@ class Repository:
         debug("remote_version_tags", sorted(tags, key=Version))
         return tags
 
-    def commits_since_tag(self, tag: str) -> list[str]:
+    def commits_between(self, from_ref: str, to_ref: str) -> list[str]:
         # --format=%H emits one bare hash per line with no decorations,
         # making it locale-independent and stable across git versions.
-        # Empty output (tag at HEAD) correctly produces an empty list.
-        output, _ = self._git("log", f"{tag}..HEAD", "--format=%H")
+        output, _ = self._git("log", f"{from_ref}..{to_ref}", "--format=%H")
         result = output.splitlines()
-        debug("commits_since_tag", result)
+        debug("commits_between", result)
         return result
 
     def shortlog_since(self, tag: str, indent: int = 0) -> str:
@@ -405,6 +404,8 @@ class BackportReleaser(Releaser):
             )
             check_version_format(expected)
             check_tag_exists_on_remote(self.repo, expected)
+            check_tag_on_backport_branch(self.repo, expected)
+            check_tag_has_real_commits(self.repo, expected, series_remote)
             check_is_contiguous(expected, prior_series)
             check_is_unique(expected, pypi_versions)
             check_is_contiguous(expected, series_pypi)
@@ -552,6 +553,38 @@ def check_tag_exists_on_remote(repo: Repository, version: str) -> None:
         )
 
 
+def check_tag_has_real_commits(
+    repo: Repository, version: str, series: list[str]
+) -> None:
+    """Raise if the tag contains only the release commit and no real changes.
+
+    Checks commits between the previous tag in the series and `version`.
+    The release commit itself is always present, so at least 2 commits are required.
+    """
+    prior = [t for t in series if t != version]
+    if not prior:
+        return
+    previous = max(prior, key=Version)
+    commits = repo.commits_between(previous, version)
+    if len(commits) <= 1:
+        raise InvalidReleaseError(
+            f"Tag {version!r} contains no real commits since {previous!r} "
+            f"(only the release commit found)"
+        )
+
+
+def check_tag_on_backport_branch(repo: Repository, version: str) -> None:
+    """Raise if the tag commit is not reachable from the expected maintenance branch."""
+    major, minor, _ = Version(version).release
+    branch = f"{major}.{minor}"
+    repo.fetch(REPO_URL, branch)
+    if not repo.is_ancestor(version, "FETCH_HEAD"):
+        raise InvalidReleaseError(
+            f"Tag {version!r} is not on the {branch!r} maintenance branch — "
+            f"backport releases must be tagged from the maintenance branch."
+        )
+
+
 def check_in_sync_with_upstream(
     repo: Repository, branch: str = DEFAULT_BRANCH
 ) -> None:
@@ -583,7 +616,7 @@ def check_has_unreleased_commits(repo: Repository, series: list[str]) -> None:
             "ensure the repository was cloned with full history (fetch-depth: 0)"
         )
     latest_tag = max(series, key=Version)
-    commits = repo.commits_since_tag(latest_tag)
+    commits = repo.commits_between(latest_tag, "HEAD")
     if len(commits) <= 1:
         raise InvalidReleaseError(
             f"No unreleased commits since {latest_tag!r} "

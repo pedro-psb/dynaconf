@@ -11,6 +11,7 @@ from release_utility import check_is_unique
 from release_utility import check_no_local_tag
 from release_utility import check_on_release_branch
 from release_utility import check_tag_exists_on_remote
+from release_utility import check_tag_on_backport_branch
 from release_utility import check_version_format
 from release_utility import check_version_matches_expected
 from release_utility import InvalidReleaseError
@@ -206,6 +207,23 @@ class TestCheckNoLocalTag:
             check_no_local_tag(repo, "3.3.0")
 
 
+class TestCheckTagOnBackportBranch:
+    def test_passes_when_tag_is_on_maintenance_branch(self):
+        repo = MagicMock()
+        repo.is_ancestor.return_value = True
+        check_tag_on_backport_branch(repo, "3.4.3")
+        repo.fetch.assert_called_once_with(REPO_URL, "3.4")
+        repo.is_ancestor.assert_called_once_with("3.4.3", "FETCH_HEAD")
+
+    def test_raises_when_tag_is_not_on_maintenance_branch(self):
+        repo = MagicMock()
+        repo.is_ancestor.return_value = False
+        with pytest.raises(
+            InvalidReleaseError, match="not on the '3.4' maintenance branch"
+        ):
+            check_tag_on_backport_branch(repo, "3.4.3")
+
+
 class TestCheckTagExistsOnRemote:
     def test_passes(self):
         repo = MagicMock()
@@ -233,7 +251,7 @@ class TestCheckHasUnreleasedCommits:
     )
     def test_passes(self, commits):
         repo = MagicMock()
-        repo.commits_since_tag.return_value = commits
+        repo.commits_between.return_value = commits
         check_has_unreleased_commits(repo, ["3.2.4"])
 
     @pytest.mark.parametrize(
@@ -245,7 +263,7 @@ class TestCheckHasUnreleasedCommits:
     )
     def test_raises(self, commits):
         repo = MagicMock()
-        repo.commits_since_tag.return_value = commits
+        repo.commits_between.return_value = commits
         with pytest.raises(InvalidReleaseError, match="No unreleased commits"):
             check_has_unreleased_commits(repo, ["3.2.4"])
 
