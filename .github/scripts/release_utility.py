@@ -17,6 +17,7 @@ import urllib.error
 import urllib.request
 from abc import ABC
 from abc import abstractmethod
+from typing import Optional
 
 from packaging.version import InvalidVersion
 from packaging.version import Version
@@ -362,8 +363,8 @@ class BackportReleaser(Releaser):
     def _filter_series(
         versions: list[str],
         *,
-        by_xy: tuple[int, int] | None = None,
-        exclude: list[str] | None = None,
+        by_xy: Optional[tuple[int, int]] = None,
+        exclude: Optional[list[str]] = None,
     ) -> list[str]:
         if by_xy is not None and exclude is not None:
             raise ValueError("by_xy and exclude are mutually exclusive")
