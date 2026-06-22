@@ -144,9 +144,11 @@ class TestCheckOnReleaseBranch:
         with pytest.raises(InvalidReleaseError):
             check_on_release_branch(repo)
 
-    def test_raises_not_implemented_for_backport(self):
-        with pytest.raises(NotImplementedError):
-            check_on_release_branch(MagicMock(), is_backport_release=True)
+    def test_raises_for_non_master(self):
+        repo = MagicMock()
+        repo.current_branch.return_value = "3.3"
+        with pytest.raises(InvalidReleaseError):
+            check_on_release_branch(repo)
 
 
 class TestCheckCleanWorkingTree:

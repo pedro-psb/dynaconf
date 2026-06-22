@@ -81,11 +81,11 @@ class Repository:
         debug("working_tree_status", repr(result) if result else "clean")
         return result
 
-    def sync_counts(self, url: str) -> tuple[int, int]:
-        """Return (ahead, behind) commit counts relative to the remote master."""
+    def sync_counts(self, url: str, branch: str = "master") -> tuple[int, int]:
+        """Return (ahead, behind) commit counts relative to the remote branch."""
         # Fetch by URL, not by remote name, so this works regardless of how
         # the user has their remotes configured.
-        self._git("fetch", url, "master")
+        self._git("fetch", url, branch)
         # FETCH_HEAD is always written by the fetch above, so these counts
         # reflect exactly what was just fetched — no stale remote-tracking ref.
         ahead_out, _ = self._git("rev-list", "--count", "FETCH_HEAD..HEAD")
@@ -214,20 +214,24 @@ class VersionBumper:
 
 def run(args: argparse.Namespace) -> None:
     if args.command == "validate":
-        validate(args.version, publish=args.publish)
+        validate(args.version, publish=args.publish, backport=args.backport)
     elif args.command == "rolling-release":
         rolling_release(yes=args.yes)
+    elif args.command == "backport-release":
+        backport_release(yes=args.yes)
     elif args.command == "get":
         if args.item == "backport-branch":
             major, minor, _ = Version(
                 VersionBumper().calculated_next()
             ).release
             info(f"{major}.{minor}")
-    elif args.command == "backport-release":
-        raise NotImplementedError("backport-release is not yet implemented")
+        elif args.item == "next-version":
+            info(VersionBumper().calculated_next())
 
 
-def validate(expected: str, *, publish: bool = False) -> None:
+def validate(
+    expected: str, *, publish: bool = False, backport: bool = False
+) -> None:
     repo = Repository()
     run_from_root(repo)
 
@@ -236,7 +240,7 @@ def validate(expected: str, *, publish: bool = False) -> None:
     latest_remote_tag = max(remote_tags, key=Version)
     calculated = VersionBumper().calculated_next()
 
-    debug("mode", "publish" if publish else "release")
+    debug("mode", "publish" if publish else ("backport" if backport else "release"))
     debug("running_ci", RUNNING_CI)
     debug("next_version", calculated)
     debug("expected", expected)
@@ -256,6 +260,37 @@ def validate(expected: str, *, publish: bool = False) -> None:
         # PyPI
         check_is_unique(expected, pypi_versions)
         check_is_contiguous(expected, pypi_versions)
+    elif backport:
+        # Backport mode: releasing a patch from an X.Y maintenance branch.
+        check_is_patch_release(expected)
+        check_on_backport_branch(repo, expected)
+        check_version_format(expected)
+        check_clean_working_tree(repo)
+        major, minor, _ = Version(expected).release
+        if not RUNNING_CI:
+            check_no_local_tag(repo, expected)
+            check_in_sync_with_upstream(repo, branch=f"{major}.{minor}")
+        series_local = [
+            t for t in repo.local_version_tags()
+            if Version(t).release[:2] == (major, minor)
+        ]
+        if not series_local:
+            raise InvalidReleaseError(
+                f"no local tags found for the {major}.{minor}.x series — "
+                f"ensure the repository was cloned with full history (fetch-depth: 0)"
+            )
+        check_has_unreleased_commits(repo, max(series_local, key=Version))
+
+        # PyPI — uniqueness only; contiguity is scoped to the X.Y series below
+        check_is_unique(expected, pypi_versions)
+
+        # Remote VCS tags — unique globally, contiguous within the X.Y series
+        check_is_unique(expected, remote_tags)
+        series_remote = [
+            t for t in remote_tags
+            if Version(t).release[:2] == (major, minor)
+        ]
+        check_is_contiguous(expected, series_remote)
     else:
         # Release mode: full pre-flight before creating the release commit.
         # Local state
@@ -279,25 +314,8 @@ def validate(expected: str, *, publish: bool = False) -> None:
     info(f"[OK] Release {expected!r} passed all validation checks.")
 
 
-def rolling_release(*, yes: bool = False) -> None:
-    """Bump version, update changelog, create release commit + tag, then post-release bump."""
-    repo = Repository()
-    bumper = VersionBumper()
-    run_from_root(repo)
-
-    previous = max(repo.local_version_tags(), key=Version)
-    next_version = bumper.calculated_next()
-    info(f"Previous release : {previous}")
-    info(f"Next release     : {next_version}")
-    validate(next_version)
-    check_backport_branch_compatible(repo, next_version)
-
-    if not yes:
-        answer = input("Type 'yes' to confirm: ")
-        if answer.strip().lower() != "yes":
-            print("[ABORTED] Release cancelled.", file=sys.stderr)  # noqa: T201
-            sys.exit(2)
-
+def cut_release(repo: Repository, bumper: VersionBumper, previous: str) -> str:
+    """Bump to release, commit, tag, post-release bump. Returns the released version."""
     info("[BUMP] Bumping version files: x.y.z-dev0 -> x.y.z")
     current_version = bumper.bump_to_release()
 
@@ -321,6 +339,30 @@ def rolling_release(*, yes: bool = False) -> None:
     info("[COMMIT] Creating post-release bump commit: x.y.z -> x.y.next-dev0")
     bumper.bump_to_next_dev()
 
+    return current_version
+
+
+def rolling_release(*, yes: bool = False) -> None:
+    """Bump version, update changelog, create release commit + tag, then post-release bump."""
+    repo = Repository()
+    bumper = VersionBumper()
+    run_from_root(repo)
+
+    previous = max(repo.local_version_tags(), key=Version)
+    next_version = bumper.calculated_next()
+    info(f"Previous release : {previous}")
+    info(f"Next release     : {next_version}")
+    validate(next_version)
+    check_backport_branch_compatible(repo, next_version)
+
+    if not yes:
+        answer = input("Type 'yes' to confirm: ")
+        if answer.strip().lower() != "yes":
+            print("[ABORTED] Release cancelled.", file=sys.stderr)  # noqa: T201
+            sys.exit(2)
+
+    current_version = cut_release(repo, bumper, previous)
+
     major, minor, _ = Version(current_version).release
     branch = f"{major}.{minor}"
     if not repo.branch_exists(branch):
@@ -333,6 +375,35 @@ def rolling_release(*, yes: bool = False) -> None:
         info(
             f"[BRANCH] Backport branch {branch} already exists and has diverged, skipping"
         )
+
+    info("[COMMIT] Done.")
+
+
+def backport_release(*, yes: bool = False) -> None:
+    """Bump version, update changelog, create release commit + tag, then post-release bump on backport branch."""
+    repo = Repository()
+    bumper = VersionBumper()
+    run_from_root(repo)
+
+    next_version = bumper.calculated_next()
+    info(f"Next release     : {next_version}")
+    validate(next_version, backport=True)
+
+    major, minor, _ = Version(next_version).release
+    series_tags = [
+        t for t in repo.local_version_tags()
+        if Version(t).release[:2] == (major, minor)
+    ]
+    previous = max(series_tags, key=Version)
+    info(f"Previous release : {previous}")
+
+    if not yes:
+        answer = input("Type 'yes' to confirm: ")
+        if answer.strip().lower() != "yes":
+            print("[ABORTED] Release cancelled.", file=sys.stderr)  # noqa: T201
+            sys.exit(2)
+
+    cut_release(repo, bumper, previous)
 
     info("[COMMIT] Done.")
 
@@ -418,16 +489,38 @@ def check_is_contiguous(version: str, released: list[str]) -> None:
         )
 
 
-def check_on_release_branch(
-    repo: Repository, *, is_backport_release: bool = False
-) -> None:
-    """Raise if the current branch is not an allowed release branch."""
-    if is_backport_release:
-        raise NotImplementedError("backport releases are not yet supported")
+def check_on_release_branch(repo: Repository) -> None:
+    """Raise if the current branch is not master."""
     branch = repo.current_branch()
     if branch != "master":
         raise InvalidReleaseError(
             f"branch {branch!r} is not an allowed release branch"
+        )
+
+
+def check_on_backport_branch(repo: Repository, version: str) -> None:
+    """Raise if the current branch is not the X.Y maintenance branch for `version`."""
+    branch = repo.current_branch()
+    major, minor, _ = Version(version).release
+    expected = f"{major}.{minor}"
+    if branch != expected:
+        raise InvalidReleaseError(
+            f"branch {branch!r} does not match version {version!r} (expected {expected!r})"
+        )
+
+
+def check_is_patch_release(version: str) -> None:
+    """Raise if `version` is not a patch (Z > 0) release.
+
+    Backport branches only ever produce patch releases. Minor and major bumps
+    belong on master.
+    """
+    _, _, patch = Version(version).release
+    if patch == 0:
+        raise InvalidReleaseError(
+            f"{version!r} is not a patch release (Z=0). "
+            "Backport branches can only produce patch releases — "
+            "bump the minor version on master instead."
         )
 
 
@@ -449,9 +542,11 @@ def check_tag_exists_on_remote(repo: Repository, version: str) -> None:
         )
 
 
-def check_in_sync_with_upstream(repo: Repository) -> None:
-    """Raise if the local branch is ahead, behind, or diverged from upstream master."""
-    ahead, behind = repo.sync_counts(REPO_URL)
+def check_in_sync_with_upstream(
+    repo: Repository, branch: str = "master"
+) -> None:
+    """Raise if the local branch is ahead, behind, or diverged from the remote branch."""
+    ahead, behind = repo.sync_counts(REPO_URL, branch)
     if ahead > 0 and behind > 0:
         raise InvalidReleaseError(
             f"branch has diverged: {ahead} commit(s) ahead, {behind} behind upstream"
@@ -529,6 +624,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Run publish-mode checks (tag already on remote, not yet on PyPI)",
     )
+    validate_parser.add_argument(
+        "--backport",
+        action="store_true",
+        help="Run backport-mode checks (patch release from an X.Y maintenance branch)",
+    )
 
     rolling_parser = subparsers.add_parser(
         "rolling-release",
@@ -547,10 +647,21 @@ def build_parser() -> argparse.ArgumentParser:
         help="Skip confirmation prompt",
     )
 
-    subparsers.add_parser(
+    backport_parser = subparsers.add_parser(
         "backport-release",
-        help="Cut a backport release from a maintenance branch (not yet implemented)",
+        help="Cut a patch release from an X.Y maintenance branch (no PyPI publish)",
+        description=(
+            "Cut a patch release from the current X.Y maintenance branch.\n\n"
+            "Does not publish to PyPI. Steps: bump dev -> release, update changelog, "
+            "commit, tag, then bump to next dev. Must be run on an X.Y branch."
+        ),
         formatter_class=HELP_FORMATTER,
+    )
+    backport_parser.add_argument(
+        "-y",
+        "--yes",
+        action="store_true",
+        help="Skip confirmation prompt",
     )
 
     get_parser = subparsers.add_parser(
@@ -559,13 +670,14 @@ def build_parser() -> argparse.ArgumentParser:
         description=(
             "Print a computed release value and exit.\n\n"
             "Supported items:\n"
-            "  backport-branch  The X.Y branch name for the next release (e.g. 3.3.2 → '3.3', 3.4.0 → '3.4')"
+            "  backport-branch  The X.Y branch name for the next release (e.g. 3.3.2 → '3.3', 3.4.0 → '3.4')\n"
+            "  next-version     The calculated next release version (e.g. 3.3.2-dev0 → '3.3.2')"
         ),
         formatter_class=HELP_FORMATTER,
     )
     get_parser.add_argument(
         "item",
-        choices=["backport-branch"],
+        choices=["backport-branch", "next-version"],
         help="The value to retrieve",
     )
 
