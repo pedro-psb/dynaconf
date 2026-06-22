@@ -2,6 +2,22 @@ Changelog
 =========
 
 <!-- insertion marker -->
+## [3.5.1](https://github.com/pedro-psb/dynaconf/releases/tag/3.5.1) - 2026-06-22
+
+### Bug Fixes
+
+- infer release type in the publish workflow. *By Pedro Brochado*.
+- checkout to correct tag on backport release. *By Pedro Brochado*.
+- run release_utility from master (up-to-date) on backport workflow. *By Pedro Brochado*.
+
+### Features
+
+- make release utility a package. *By Pedro Brochado*.
+
+### Chore
+
+- bump version to 3.5.1-dev0. *By pedro-psb*.
+
 ## [3.5.0](https://github.com/pedro-psb/dynaconf/releases/tag/3.5.0) - 2026-06-22
 
 ### Bug Fixes
