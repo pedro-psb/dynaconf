@@ -30,6 +30,9 @@ jobs:
           # Install the release utility as a package from master so the command
           # is always the canonical version regardless of how the workflow was triggered.
           uv pip install .github/scripts/
+      - name: Check out release tag
+        run: |
+          git checkout "${{ inputs.release-tag || github.ref_name }}"
       - name: Validate release
         run: uv run release-utility validate --pre-publish "${{ inputs.release-tag || github.ref_name }}"
 
