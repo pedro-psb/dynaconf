@@ -2,6 +2,13 @@ Changelog
 =========
 
 <!-- insertion marker -->
+## [3.4.0](https://github.com/pedro-psb/dynaconf/releases/tag/3.4.0) - 2026-06-22
+
+### Chore
+
+- bump version to 3.4.0-dev0. *By Pedro Brochado*.
+- bump version to 3.3.4-dev0. *By pedro-psb*.
+
 ## [3.3.3](https://github.com/pedro-psb/dynaconf/releases/tag/3.3.3) - 2026-06-20
 
 ### Bug Fixes
