@@ -81,7 +81,7 @@ dist: clean
 # Bump
 # Used if we want a minor release.
 bump-minor:
-	bump-my-version bump minor
+	bump-my-version bump minor --commit
 
 # Release
 # Usage: make release
