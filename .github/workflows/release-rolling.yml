@@ -4,12 +4,12 @@ on:
   workflow_dispatch:
     inputs:
       expected-release:
-        description: "Expected next release version (e.g. 3.2.5). Must match the version calculated from main."
+        description: "Expected next release version. Must match the version calculated from main."
         required: true
         type: string
 
 jobs:
-  release:
+  rolling-release:
     name: "Validate, commit, and push release"
     runs-on: ubuntu-latest
     steps:
@@ -21,6 +21,7 @@ jobs:
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
       - uses: actions/checkout@v7
         with:
+          ref: master
           fetch-depth: 0
           token: ${{ steps.app-token.outputs.token }}
       - name: Install uv
@@ -30,17 +31,24 @@ jobs:
       - name: Install release tools
         run: |
           uv sync --only-group release
+          # Install the release utility as a package from master so the command
+          # is always the canonical version regardless of how the workflow was triggered.
+          uv pip install .github/scripts/
       - name: Set up git identity
         run: |
           git config user.name "${{ github.actor }}"
           git config user.email "${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com"
-      - name: Create release commits
-        id: release
+      - name: Validate release
         run: |
-          uv run make release VERSION="${{ inputs.expected-release }}"
-          # derives the X.Y backport branch from the release version (e.g. 3.3.2 → "3.3", 3.4.0 → "3.4")
-          BRANCH=$(uv run python .github/scripts/release_utility.py get backport-branch)
-          echo "backport-branch=$BRANCH" >> "$GITHUB_OUTPUT"
+          uv run release-utility validate "${{ inputs.expected-release }}"
+      - name: Create release commits
+        run: |
+          uv run release-utility rolling-release -y
+      - name: Resolve backport branch
+        id: branch
+        run: |
+          BRANCH=$(uv run release-utility get backport-branch)
+          echo "name=$BRANCH" >> "$GITHUB_OUTPUT"
       - name: Push release
         run: |
           # --atomic ensures all three refs land together or none do.
@@ -50,4 +58,4 @@ jobs:
           git push --atomic origin \
             master \
             "refs/tags/${{ inputs.expected-release }}" \
-            "${{ steps.release.outputs.backport-branch }}"
+            "${{ steps.branch.outputs.name }}"

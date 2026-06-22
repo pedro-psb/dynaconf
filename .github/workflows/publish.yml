@@ -25,9 +25,13 @@ jobs:
         with:
           python-version: "3.9"
       - name: Install release tools
-        run: uv sync --only-group release
+        run: |
+          uv sync --only-group release
+          # Install the release utility as a package from master so the command
+          # is always the canonical version regardless of how the workflow was triggered.
+          uv pip install .github/scripts/
       - name: Validate release
-        run: uv run python .github/scripts/release_utility.py validate --pre-publish "${{ inputs.release-tag || github.ref_name }}"
+        run: uv run release-utility validate --pre-publish "${{ inputs.release-tag || github.ref_name }}"
 
   build-dist:
     name: "Build distribution"

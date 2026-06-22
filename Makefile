@@ -78,36 +78,9 @@ dist: clean
 	@python -m build
 	@make source_vendor
 
-# Bump
-# Used if we want a minor release.
+# Bump X.Y.Z.dev to X.Y+1.0.dev
 bump-minor:
 	bump-my-version bump minor --commit
-
-# Release
-# Usage: make release VERSION=x.y.z
-# Validates, creates release commits, tags, and bumps to next dev version.
-# Push is handled by the CI workflow.
-release:
-	@if [ -z "$(VERSION)" ]; then echo "Error: VERSION is required. Usage: make release VERSION=x.y.z"; exit 1; fi
-	# $(MAKE) run-pre-commit
-	# $(MAKE) test_only
-	uv run python .github/scripts/release_utility.py validate "$(VERSION)"
-	uv run python .github/scripts/release_utility.py rolling-release -y
-
-# Backport Release
-# Usage: make backport-release
-# Validates and creates a patch release from the current X.Y maintenance branch.
-# Push is handled by the CI workflow.
-backport-release:
-	# $(MAKE) run-pre-commit
-	# $(MAKE) test_only
-	uv run python .github/scripts/release_utility.py backport-release -y
-
-# Publish
-# 1. Publish to PiPY
-# 2. TODO: Publish to Github (Github Release)
-publish:
-	@twine upload dist/*
 
 clean:
 	@find ./ -name '*.pyc' -exec rm -f {} \;

@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       expected-release:
-        description: "Backport release version (e.g. 3.3.4). Must match the version calculated on the backport branch."
+        description: "Backport release version. Must match the version calculated on the backport branch."
         required: true
         type: string
 
