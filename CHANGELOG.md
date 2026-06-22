@@ -2,6 +2,22 @@ Changelog
 =========
 
 <!-- insertion marker -->
+## [3.5.0](https://github.com/pedro-psb/dynaconf/releases/tag/3.5.0) - 2026-06-22
+
+### Bug Fixes
+
+- replace | None with Optional. *By Pedro Brochado*.
+
+### Features
+
+- some y feature. *By Pedro Brochado*.
+- some bar feature. *By Pedro Brochado*.
+
+### Chore
+
+- bump version to 3.5.0-dev0. *By Pedro Brochado*.
+- bump version to 3.4.2-dev0. *By pedro-psb*.
+
 ## [3.4.1](https://github.com/pedro-psb/dynaconf/releases/tag/3.4.1) - 2026-06-22
 
 ### Bug Fixes
