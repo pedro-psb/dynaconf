@@ -31,25 +31,27 @@ jobs:
       - name: Install release tools
         run: |
           uv sync --only-group release
+          # Install the release utility as a package from master so the installed
+          # command is unaffected by the backport branch checkout that follows.
+          uv pip install .github/scripts/
       - name: Resolve backport branch
         id: branch
         run: |
-          BRANCH=$(uv run python .github/scripts/release_utility.py get backport-branch "${{ inputs.expected-release }}")
+          BRANCH=$(uv run release-utility get backport-branch "${{ inputs.expected-release }}")
           echo "name=$BRANCH" >> "$GITHUB_OUTPUT"
       - name: Check out backport branch
         run: |
           git checkout "${{ steps.branch.outputs.name }}"
-          git checkout master -- .github/scripts/
       - name: Set up git identity
         run: |
           git config user.name "${{ github.actor }}"
           git config user.email "${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com"
       - name: Validate release
         run: |
-          uv run python .github/scripts/release_utility.py validate "${{ inputs.expected-release }}" --backport
+          uv run release-utility validate "${{ inputs.expected-release }}" --backport
       - name: Create backport release commits
         run: |
-          uv run make backport-release
+          uv run release-utility backport-release -y
       - name: Push backport release
         run: |
           # --atomic ensures both refs land together or none do.

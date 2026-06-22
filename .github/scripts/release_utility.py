@@ -718,7 +718,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-if __name__ == "__main__":
+def main() -> None:
     _args = build_parser().parse_args()
     try:
         run(_args)
@@ -728,3 +728,7 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"[ERROR] {e}", file=sys.stderr)  # noqa: T201
         sys.exit(2)
+
+
+if __name__ == "__main__":
+    main()
