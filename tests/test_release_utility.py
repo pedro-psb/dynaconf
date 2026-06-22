@@ -280,3 +280,28 @@ class TestCheckIsAllowedRelease:
     def test_raises(self, version):
         with pytest.raises(InvalidReleaseError):
             check_version_format(version)
+
+
+class TestGetReleaseType:
+    TAGS = ["3.3.0", "3.3.1", "3.3.4", "3.4.0", "3.5.0", "3.5.1"]
+
+    @pytest.mark.parametrize(
+        "tag,expected",
+        [
+            pytest.param(
+                "3.5.1", "rolling", id="latest-patch-in-latest-series"
+            ),
+            pytest.param("3.5.0", "rolling", id="first-in-latest-series"),
+            pytest.param("3.3.4", "backport", id="patch-in-older-series"),
+            pytest.param("3.3.0", "backport", id="first-in-older-series"),
+            pytest.param("3.4.0", "backport", id="older-minor-series"),
+            pytest.param(
+                "3.5.2", "rolling", id="next-rolling-not-yet-in-remote"
+            ),
+            pytest.param(
+                "3.4.1", "backport", id="next-backport-not-yet-in-remote"
+            ),
+        ],
+    )
+    def test_release_type(self, tag, expected):
+        assert Releaser.get_release_type(tag, self.TAGS) == expected

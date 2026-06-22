@@ -279,6 +279,14 @@ class Releaser(ABC):
                 sys.exit(2)
 
     @staticmethod
+    def get_release_type(tag: str, remote_tags: list[str]) -> str:
+        """Return 'rolling' if tag is in the latest (major, minor) series, 'backport' otherwise."""
+        latest = max(remote_tags, key=Version)
+        tag_xy = Version(tag).release[:2]
+        latest_xy = Version(latest).release[:2]
+        return "backport" if tag_xy < latest_xy else "rolling"
+
+    @staticmethod
     def _fetch_pypi_versions() -> list[str]:
         """Return the list of versions published on PyPI for dynaconf."""
         try:
@@ -438,34 +446,6 @@ class BackportReleaser(Releaser):
         self._confirm(yes)
         self._cut_release(previous)
         info("[COMMIT] Done.")
-
-
-def run(args: argparse.Namespace) -> None:
-    repo = Repository()
-    bumper = VersionBumper()
-    run_from_root(repo)
-
-    if args.command == "validate":
-        cls = BackportReleaser if args.backport else RollingReleaser
-        cls(repo, bumper).validate(args.version, pre_publish=args.pre_publish)
-    elif args.command == "rolling-release":
-        RollingReleaser(repo, bumper).release(yes=args.yes)
-    elif args.command == "backport-release":
-        BackportReleaser(repo, bumper).release(yes=args.yes)
-    elif args.command == "get":
-        if args.item == "backport-branch":
-            version = args.value or bumper.calculated_next()
-            major, minor, _ = Version(version).release
-            info(f"{major}.{minor}")
-        elif args.item == "next-version":
-            info(bumper.calculated_next())
-        elif args.item == "release-type":
-            repo.fetch(REPO_URL, DEFAULT_BRANCH)
-            info(
-                "rolling"
-                if repo.is_ancestor(args.value, "FETCH_HEAD")
-                else "backport"
-            )
 
 
 def check_version_format(version: str) -> None:
@@ -718,6 +698,30 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     return parser
+
+
+def run(args: argparse.Namespace) -> None:
+    repo = Repository()
+    bumper = VersionBumper()
+    run_from_root(repo)
+
+    if args.command == "validate":
+        cls = BackportReleaser if args.backport else RollingReleaser
+        cls(repo, bumper).validate(args.version, pre_publish=args.pre_publish)
+    elif args.command == "rolling-release":
+        RollingReleaser(repo, bumper).release(yes=args.yes)
+    elif args.command == "backport-release":
+        BackportReleaser(repo, bumper).release(yes=args.yes)
+    elif args.command == "get":
+        if args.item == "backport-branch":
+            version = args.value or bumper.calculated_next()
+            major, minor, _ = Version(version).release
+            info(f"{major}.{minor}")
+        elif args.item == "next-version":
+            info(bumper.calculated_next())
+        elif args.item == "release-type":
+            remote_tags = repo.remote_version_tags(REPO_URL)
+            info(Releaser.get_release_type(args.value, remote_tags))
 
 
 def main() -> None:
