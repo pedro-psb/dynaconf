@@ -297,11 +297,9 @@ class RollingReleaser(Releaser):
     def validate(self, expected: str, *, pre_publish: bool = False) -> None:
         pypi_versions = self._fetch_pypi_versions()
         remote_tags = self.repo.remote_version_tags(REPO_URL)
-        calculated = self.bumper.calculated_next()
 
         debug("mode", "pre_publish" if pre_publish else "release")
         debug("running_ci", RUNNING_CI)
-        debug("next_version", calculated)
         debug("expected", expected)
         debug("repo_url", REPO_URL)
         debug("pypi_url", PYPI_URL)
@@ -315,6 +313,8 @@ class RollingReleaser(Releaser):
             check_is_unique(expected, pypi_versions)
             check_is_contiguous(expected, pypi_versions)
         else:
+            calculated = self.bumper.calculated_next()
+            debug("next_version", calculated)
             check_on_release_branch(self.repo)
             check_version_matches_expected(calculated, expected)
             check_clean_working_tree(self.repo)
@@ -380,20 +380,16 @@ class BackportReleaser(Releaser):
     def validate(self, expected: str, *, pre_publish: bool = False) -> None:
         pypi_versions = self._fetch_pypi_versions()
         remote_tags = self.repo.remote_version_tags(REPO_URL)
-        local_tags = self.repo.local_version_tags()
-        calculated = self.bumper.calculated_next()
         major, minor, _ = Version(expected).release
 
         debug("mode", "backport-publish" if pre_publish else "backport")
         debug("running_ci", RUNNING_CI)
-        debug("next_version", calculated)
         debug("expected", expected)
         debug("repo_url", REPO_URL)
         debug("pypi_url", PYPI_URL)
 
         series_remote = self._filter_series(remote_tags, by_xy=(major, minor))
         series_pypi = self._filter_series(pypi_versions, by_xy=(major, minor))
-        series_local = self._filter_series(local_tags, by_xy=(major, minor))
 
         if pre_publish:
             prior_series = self._filter_series(
@@ -405,6 +401,12 @@ class BackportReleaser(Releaser):
             check_is_unique(expected, pypi_versions)
             check_is_contiguous(expected, series_pypi)
         else:
+            local_tags = self.repo.local_version_tags()
+            series_local = self._filter_series(
+                local_tags, by_xy=(major, minor)
+            )
+            calculated = self.bumper.calculated_next()
+            debug("next_version", calculated)
             check_on_backport_branch(self.repo, expected)
             check_is_patch_release(expected)
             check_version_format(expected)

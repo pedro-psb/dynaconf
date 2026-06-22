@@ -30,11 +30,18 @@ jobs:
           # Install the release utility as a package from master so the command
           # is always the canonical version regardless of how the workflow was triggered.
           uv pip install .github/scripts/
+      - name: Detect release type
+        id: release-type
+        run: |
+          TYPE=$(uv run release-utility get release-type "${{ inputs.release-tag || github.ref_name }}")
+          echo "value=$TYPE" >> "$GITHUB_OUTPUT"
       - name: Check out release tag
         run: |
           git checkout "${{ inputs.release-tag || github.ref_name }}"
       - name: Validate release
-        run: uv run release-utility validate --pre-publish "${{ inputs.release-tag || github.ref_name }}"
+        run: |
+          FLAG=$([[ "${{ steps.release-type.outputs.value }}" == "backport" ]] && echo "--backport" || echo "")
+          uv run release-utility validate --pre-publish $FLAG "${{ inputs.release-tag || github.ref_name }}"
 
   build-dist:
     name: "Build distribution"
