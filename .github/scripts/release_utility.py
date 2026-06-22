@@ -286,7 +286,7 @@ class Releaser(ABC):
                 data = json.loads(response.read())
         except urllib.error.HTTPError as e:
             raise InvalidReleaseError(
-                f"failed to fetch PyPI versions from {PYPI_URL!r}: {e}"
+                f"Failed to fetch PyPI versions from {PYPI_URL!r}: {e}"
             ) from e
         result = list(data["releases"].keys())
         debug("pypi_versions", sorted(result, key=Version))
@@ -405,8 +405,8 @@ class BackportReleaser(Releaser):
             check_is_unique(expected, pypi_versions)
             check_is_contiguous(expected, series_pypi)
         else:
-            check_is_patch_release(expected)
             check_on_backport_branch(self.repo, expected)
+            check_is_patch_release(expected)
             check_version_format(expected)
             check_version_matches_expected(calculated, expected)
             check_clean_working_tree(self.repo)
@@ -452,7 +452,8 @@ def run(args: argparse.Namespace) -> None:
         BackportReleaser(repo, bumper).release(yes=args.yes)
     elif args.command == "get":
         if args.item == "backport-branch":
-            major, minor, _ = Version(bumper.calculated_next()).release
+            version = args.value or bumper.calculated_next()
+            major, minor, _ = Version(version).release
             info(f"{major}.{minor}")
         elif args.item == "next-version":
             info(bumper.calculated_next())
@@ -482,14 +483,14 @@ def check_version_matches_expected(calculated: str, expected: str) -> None:
     """
     if calculated != expected:
         raise InvalidReleaseError(
-            f"calculated version {calculated!r} does not match expected {expected!r}"
+            f"Calculated version {calculated!r} does not match expected {expected!r}"
         )
 
 
 def check_is_unique(version: str, released: list[str]) -> None:
     """Raise if `version` is already present in `released`."""
     if not released:
-        raise InvalidReleaseError("released list cannot be empty")
+        raise InvalidReleaseError("Released list cannot be empty")
     if version in released:
         raise InvalidReleaseError(f"{version!r} is already released")
 
@@ -501,7 +502,7 @@ def check_is_contiguous(version: str, released: list[str]) -> None:
     are valid. A jump to 3.2.6 or 3.4.0 would be rejected.
     """
     if not released:
-        raise InvalidReleaseError("released list cannot be empty")
+        raise InvalidReleaseError("Released list cannot be empty")
     latest = max(released, key=Version)
     lat_x, lat_y, lat_z = Version(latest).release
     new_x, new_y, new_z = Version(version).release
@@ -521,7 +522,7 @@ def check_on_release_branch(repo: Repository) -> None:
     branch = repo.current_branch()
     if branch != DEFAULT_BRANCH:
         raise InvalidReleaseError(
-            f"branch {branch!r} is not an allowed release branch"
+            f"Branch {branch!r} is not an allowed release branch"
         )
 
 
@@ -532,7 +533,7 @@ def check_on_backport_branch(repo: Repository, version: str) -> None:
     expected = f"{major}.{minor}"
     if branch != expected:
         raise InvalidReleaseError(
-            f"branch {branch!r} does not match version {version!r} (expected {expected!r})"
+            f"Branch {branch!r} does not match version {expected!r} required for a {version!r} backport release."
         )
 
 
@@ -555,7 +556,7 @@ def check_no_local_tag(repo: Repository, version: str) -> None:
     """Raise if `version` already exists as a local git tag."""
     if version in repo.local_version_tags():
         raise InvalidReleaseError(
-            f"tag {version!r} already exists locally. "
+            f"Tag {version!r} already exists locally. "
             f"Consider removing it with: git tag -d {version} "
             f"(only if it does not exist upstream)."
         )
@@ -565,7 +566,7 @@ def check_tag_exists_on_remote(repo: Repository, version: str) -> None:
     """Raise if `version` does not exist as a remote git tag."""
     if version not in repo.remote_version_tags(REPO_URL):
         raise InvalidReleaseError(
-            f"tag {version!r} does not exist on remote {REPO_URL!r}"
+            f"Tag {version!r} does not exist on remote {REPO_URL!r}"
         )
 
 
@@ -576,15 +577,15 @@ def check_in_sync_with_upstream(
     ahead, behind = repo.sync_counts(REPO_URL, branch)
     if ahead > 0 and behind > 0:
         raise InvalidReleaseError(
-            f"branch has diverged: {ahead} commit(s) ahead, {behind} behind upstream"
+            f"Branch has diverged: {ahead} commit(s) ahead, {behind} behind upstream"
         )
     if behind > 0:
         raise InvalidReleaseError(
-            f"branch is {behind} commit(s) behind upstream"
+            f"Branch is {behind} commit(s) behind upstream"
         )
     if ahead > 0:
         raise InvalidReleaseError(
-            f"branch is {ahead} commit(s) ahead of upstream"
+            f"Branch is {ahead} commit(s) ahead of upstream"
         )
 
 
@@ -596,14 +597,14 @@ def check_has_unreleased_commits(repo: Repository, series: list[str]) -> None:
     """
     if not series:
         raise InvalidReleaseError(
-            "no local tags found for this series — "
+            "No local tags found for this series — "
             "ensure the repository was cloned with full history (fetch-depth: 0)"
         )
     latest_tag = max(series, key=Version)
     commits = repo.commits_since_tag(latest_tag)
     if len(commits) <= 1:
         raise InvalidReleaseError(
-            f"no unreleased commits since {latest_tag!r} "
+            f"No unreleased commits since {latest_tag!r} "
             f"(only the post-release bump commit found)"
         )
 
@@ -612,7 +613,7 @@ def check_clean_working_tree(repo: Repository) -> None:
     """Raise if the working tree has any staged, unstaged, or untracked changes."""
     status = repo.working_tree_status()
     if status:
-        raise InvalidReleaseError(f"working tree is not clean:\n{status}")
+        raise InvalidReleaseError(f"Working tree is not clean:\n{status}")
 
 
 def check_backport_branch_compatible(repo: Repository, version: str) -> None:
@@ -627,7 +628,7 @@ def check_backport_branch_compatible(repo: Repository, version: str) -> None:
         repo.branch_tip(branch), "HEAD"
     ):
         raise InvalidReleaseError(
-            f"backport branch {branch!r} exists and has diverged from HEAD.\n"
+            f"Backport branch {branch!r} exists and has diverged from HEAD.\n"
             f"To release {version!r}, either:\n"
             f"  1) Use the backport-release command if the patch fix belongs on {branch}\n"
             f"  2) Bump the minor version on master to perform a {major}.{minor + 1}.0 release instead"
@@ -697,7 +698,7 @@ def build_parser() -> argparse.ArgumentParser:
         description=(
             "Print a computed release value and exit.\n\n"
             "Supported items:\n"
-            "  backport-branch  The X.Y branch name for the next release (e.g. 3.3.2 → '3.3', 3.4.0 → '3.4')\n"
+            "  backport-branch  The X.Y branch name for a release (e.g. 3.3.2 → '3.3'). Accepts optional VALUE=<version>; defaults to calculated next.\n"
             "  next-version     The calculated next release version (e.g. 3.3.2-dev0 → '3.3.2')\n"
             "  release-type     Whether a tag is a 'rolling' or 'backport' release (requires VALUE=<tag>)"
         ),

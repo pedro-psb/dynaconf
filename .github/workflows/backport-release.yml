@@ -21,7 +21,7 @@ jobs:
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.ref_name }}
+          ref: master
           fetch-depth: 0
           token: ${{ steps.app-token.outputs.token }}
       - name: Install uv
@@ -31,6 +31,15 @@ jobs:
       - name: Install release tools
         run: |
           uv sync --only-group release
+      - name: Resolve backport branch
+        id: branch
+        run: |
+          BRANCH=$(uv run python .github/scripts/release_utility.py get backport-branch "${{ inputs.expected-release }}")
+          echo "name=$BRANCH" >> "$GITHUB_OUTPUT"
+      - name: Check out backport branch
+        run: |
+          git checkout "${{ steps.branch.outputs.name }}"
+          git checkout master -- .github/scripts/
       - name: Set up git identity
         run: |
           git config user.name "${{ github.actor }}"
@@ -47,5 +56,5 @@ jobs:
           # backport branch: the X.Y maintenance branch advanced by the release + post-release commits.
           # tag: the annotated release tag created locally by backport-release.
           git push --atomic origin \
-            "${{ github.ref_name }}" \
+            "${{ steps.branch.outputs.name }}" \
             "refs/tags/${{ inputs.expected-release }}"

@@ -246,12 +246,12 @@ class TestCheckHasUnreleasedCommits:
     def test_raises(self, commits):
         repo = MagicMock()
         repo.commits_since_tag.return_value = commits
-        with pytest.raises(InvalidReleaseError, match="no unreleased commits"):
+        with pytest.raises(InvalidReleaseError, match="No unreleased commits"):
             check_has_unreleased_commits(repo, ["3.2.4"])
 
     def test_raises_for_empty_series(self):
         repo = MagicMock()
-        with pytest.raises(InvalidReleaseError, match="no local tags found"):
+        with pytest.raises(InvalidReleaseError, match="No local tags found"):
             check_has_unreleased_commits(repo, [])
 
 
