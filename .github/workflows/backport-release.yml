@@ -35,9 +35,12 @@ jobs:
         run: |
           git config user.name "${{ github.actor }}"
           git config user.email "${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com"
+      - name: Validate release
+        run: |
+          uv run python .github/scripts/release_utility.py validate "${{ inputs.expected-release }}" --backport
       - name: Create backport release commits
         run: |
-          uv run make backport-release VERSION="${{ inputs.expected-release }}"
+          uv run make backport-release
       - name: Push backport release
         run: |
           # --atomic ensures both refs land together or none do.

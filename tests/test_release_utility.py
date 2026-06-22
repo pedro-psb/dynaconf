@@ -13,8 +13,8 @@ from release_utility import check_on_release_branch
 from release_utility import check_tag_exists_on_remote
 from release_utility import check_version_format
 from release_utility import check_version_matches_expected
-from release_utility import fetch_pypi_versions
 from release_utility import InvalidReleaseError
+from release_utility import Releaser
 from release_utility import REPO_URL
 from release_utility import Repository
 
@@ -25,7 +25,7 @@ class TestFetchers:
 
     @pytest.mark.integration
     def test_fetch_pypi_versions_returns_list_containing_known_versions(self):
-        versions = fetch_pypi_versions()
+        versions = Releaser._fetch_pypi_versions()
         assert isinstance(versions, list)
         assert self.KNOWN_VERSIONS.issubset(versions)
 
@@ -234,7 +234,7 @@ class TestCheckHasUnreleasedCommits:
     def test_passes(self, commits):
         repo = MagicMock()
         repo.commits_since_tag.return_value = commits
-        check_has_unreleased_commits(repo, "3.2.4")
+        check_has_unreleased_commits(repo, ["3.2.4"])
 
     @pytest.mark.parametrize(
         "commits",
@@ -247,7 +247,12 @@ class TestCheckHasUnreleasedCommits:
         repo = MagicMock()
         repo.commits_since_tag.return_value = commits
         with pytest.raises(InvalidReleaseError, match="no unreleased commits"):
-            check_has_unreleased_commits(repo, "3.2.4")
+            check_has_unreleased_commits(repo, ["3.2.4"])
+
+    def test_raises_for_empty_series(self):
+        repo = MagicMock()
+        with pytest.raises(InvalidReleaseError, match="no local tags found"):
+            check_has_unreleased_commits(repo, [])
 
 
 class TestCheckIsAllowedRelease:
