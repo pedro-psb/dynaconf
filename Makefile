@@ -1,5 +1,5 @@
 SHELL := /bin/bash
-.PHONY: all citest clean mypy dist docs install publish run-pre-commit run-tox setup-pre-commit test test_functional test_only test_redis test_vault help coverage-report watch_test bench
+.PHONY: all check-releases citest clean mypy dist docs install publish run-pre-commit run-tox setup-pre-commit test test_functional test_only test_redis test_vault help coverage-report watch_test bench
 help:
 	@$(MAKE) -pRrq -f $(lastword $(MAKEFILE_LIST)) : 2>/dev/null | awk -v RS= -F: '/^# File/,/^# Finished Make data base/ {if ($$1 !~ "^[#.]") {print $$1}}' | sort | egrep -v -e '^[^[:alnum:]]' -e '^$@$$'
 
@@ -77,6 +77,9 @@ dist: clean
 	@make minify_vendor
 	@python -m build
 	@make source_vendor
+
+check-releases:
+	uv run python .github/scripts/release_utility.py check
 
 # Bump X.Y.Z.dev to X.Y+1.0.dev
 bump-minor:

@@ -46,6 +46,8 @@ def fetch_pypi_versions() -> list[str]:
     result = list(data["releases"].keys())
     debug("pypi_versions", sorted(result, key=Version))
     return result
+
+
 DEFAULT_BRANCH = "master"
 
 
@@ -319,7 +321,6 @@ class Releaser(ABC):
         tag_xy = Version(tag).release[:2]
         latest_xy = Version(latest).release[:2]
         return "backport" if tag_xy < latest_xy else "rolling"
-
 
 
 class RollingReleaser(Releaser):
@@ -683,7 +684,8 @@ def check_release_status(repo: Repository) -> None:
 
     all_remote = repo.remote_branches(REPO_URL, "[0-9]*.[0-9]*")
     xy_branches = [
-        b for b in all_remote
+        b
+        for b in all_remote
         if len(b.split(".")) == 2 and all(p.isdigit() for p in b.split("."))
     ]
     branches = ["master"] + sorted(
@@ -691,6 +693,7 @@ def check_release_status(repo: Repository) -> None:
     )[:2]
     col = max(len(b) for b in branches)
 
+    info(f"Branches: {', '.join(branches)}")
     info("Available releases")
     for branch in branches:
         if branch == "master":
@@ -698,7 +701,8 @@ def check_release_status(repo: Repository) -> None:
         else:
             major, minor = (int(x) for x in branch.split("."))
             series = [
-                t for t in remote_tags
+                t
+                for t in remote_tags
                 if Version(t).release[:2] == (major, minor)
             ]
 
@@ -716,16 +720,18 @@ def check_release_status(repo: Repository) -> None:
         else:
             maj, min_, patch = Version(latest).release
             next_v = f"{maj}.{min_}.{patch + 1}"
-            info(f"  {branch:<{col}}  {next_v}  ({count} commits since {latest})")
+            info(
+                f"  {branch:<{col}}  {next_v}  ({count} commits since {latest})"
+            )
 
-    info("")
     info("Unpublished releases")
     active_series = {
         tuple(int(x) for x in b.split(".")) for b in branches if b != "master"
     }
     unpublished = sorted(
         [
-            t for t in remote_tags
+            t
+            for t in remote_tags
             if t not in pypi_versions
             and Version(t).release[:2] in active_series
         ],
@@ -831,7 +837,8 @@ def build_parser() -> argparse.ArgumentParser:
 def run(args: argparse.Namespace) -> None:
     repo = Repository()
     bumper = VersionBumper()
-    run_from_root(repo)
+    if not (args.command == "check"):
+        run_from_root(repo)
 
     if args.command == "validate":
         cls = BackportReleaser if args.backport else RollingReleaser
