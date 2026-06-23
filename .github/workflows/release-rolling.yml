@@ -48,7 +48,7 @@ jobs:
         id: branch
         run: |
           # Exits 1 (no output) for patch releases — no backport branch is created.
-          BRANCH=$(uv run release-utility get backport-branch) || true
+          BRANCH=$(uv run release-utility get backport-branch "${{ inputs.expected-release }}") || true
           echo "name=$BRANCH" >> "$GITHUB_OUTPUT"
       - name: Push release
         run: |

@@ -203,8 +203,13 @@ class Repository:
             result.append(ref.removeprefix("refs/heads/"))
         return result
 
-    def fetch(self, url: str, branch: str) -> None:
-        self._git("fetch", url, branch)
+    def fetch(self, url: str, branch: str = "", *, tags: bool = False) -> None:
+        args = ["fetch", url]
+        if branch:
+            args.append(branch)
+        if tags:
+            args.extend(["--tags", "--force"])
+        self._git(*args)
 
     def rev_parse(self, ref: str, *, short: bool = False) -> str:
         args = ["rev-parse"]
@@ -704,7 +709,8 @@ def get_backport_branches(repo: Repository) -> list[str]:
 
 def check_release_status(repo: Repository) -> None:
     """Print available releases and unpublished tags."""
-    remote_tags = repo.remote_version_tags(REPO_URL)
+    repo.fetch(REPO_URL, tags=True)
+    local_tags = repo.local_version_tags()
     pypi_versions = fetch_pypi_versions()
 
     branches = [DEFAULT_BRANCH] + get_backport_branches(repo)
@@ -713,21 +719,21 @@ def check_release_status(repo: Repository) -> None:
     info(f"Branches: {', '.join(branches)}")
     info("Available releases")
     for branch in branches:
-        if branch == "master":
-            series = remote_tags
+        if branch == DEFAULT_BRANCH:
+            local_series = local_tags
         else:
             major, minor = (int(x) for x in branch.split("."))
-            series = [
+            local_series = [
                 t
-                for t in remote_tags
+                for t in local_tags
                 if Version(t).release[:2] == (major, minor)
             ]
 
-        if not series:
+        if not local_series:
             info(f"  {branch:<{col}}  —")
             continue
 
-        latest = max(series, key=Version)
+        latest = max(local_series, key=Version)
         tip = repo.fetch_branch_tip(REPO_URL, branch)
         commits = repo.commits_between(latest, tip)
         count = len(commits) - 1  # exclude the post-release bump commit
@@ -743,12 +749,14 @@ def check_release_status(repo: Repository) -> None:
 
     info("Unpublished releases")
     active_series = {
-        tuple(int(x) for x in b.split(".")) for b in branches if b != "master"
+        tuple(int(x) for x in b.split("."))
+        for b in branches
+        if b != DEFAULT_BRANCH
     }
     unpublished = sorted(
         [
             t
-            for t in remote_tags
+            for t in local_tags
             if t not in pypi_versions
             and Version(t).release[:2] in active_series
         ],
@@ -825,7 +833,7 @@ def build_parser() -> argparse.ArgumentParser:
         description=(
             "Print a computed release value and exit.\n\n"
             "Supported items:\n"
-            "  backport-branch  With VALUE: the X.Y branch for that version (e.g. 3.3.2 → '3.3'). Without VALUE: for new minor releases returns X.(Y-1); exits 1 for patch releases (no branch created).\n"
+            "  backport-branch  The maintenance branch for VALUE: X.(Y-1) for new minor releases (e.g. 3.6.0 → '3.5'), X.Y for backport patch releases (e.g. 3.5.2 → '3.5'). Exits 1 if no branch applies.\n"
             "  next-version     The calculated next release version (e.g. 3.3.2-dev0 → '3.3.2')\n"
             "  release-type     Whether a tag is a 'rolling' or 'backport' release (requires VALUE=<tag>)"
         ),
@@ -884,16 +892,16 @@ def run(args: argparse.Namespace) -> None:
         check_release_status(repo)
     elif args.command == "get":
         if args.item == "backport-branch":
-            version = args.value or bumper.calculated_next()
-            major, minor, patch = Version(version).release
-            if args.value:
-                # Explicit version: return its X.Y branch (backport context).
-                info(f"{major}.{minor}")
-            elif patch == 0 and minor > 0:
-                # Rolling new-minor release: the branch being created is X.(Y-1).
+            if not args.value:
+                sys.exit(1)
+            major, minor, patch = Version(args.value).release
+            if patch == 0 and minor > 0:
+                # New minor release (e.g. 3.6.0): the backport branch created is X.(Y-1).
                 info(f"{major}.{minor - 1}")
+            elif patch > 0:
+                # Backport patch release (e.g. 3.5.2): the branch is X.Y.
+                info(f"{major}.{minor}")
             else:
-                # Rolling patch release: no backport branch involved.
                 sys.exit(1)
         elif args.item == "next-version":
             info(bumper.calculated_next())
@@ -912,6 +920,11 @@ def main() -> None:
     except InvalidReleaseError as e:
         print(f"[ERROR] {e}", file=sys.stderr)  # noqa: T201
         sys.exit(1)
+    except subprocess.CalledProcessError as e:
+        print(f"[ERROR] {e}", file=sys.stderr)  # noqa: T201
+        if e.stderr:
+            print(e.stderr, file=sys.stderr)  # noqa: T201
+        sys.exit(2)
     except Exception as e:
         print(f"[ERROR] {e}", file=sys.stderr)  # noqa: T201
         sys.exit(2)
