@@ -6,11 +6,15 @@ on:
       - master
     paths:
       - '.github/**'
+  workflow_dispatch:
 
 jobs:
   sync:
     name: "Create sync PRs for backport branches"
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
       - name: Generate GitHub App token
         id: app-token
@@ -52,7 +56,8 @@ jobs:
               --head "$SYNC_BRANCH" \
               --title "sync: update .github/ files for $BRANCH" \
               --body "Automated sync of \`.github/\` from master." \
-              || echo "PR already open for $BRANCH, skipping"
+              || gh pr list --head "$SYNC_BRANCH" --json number --jq '.[0].number' | grep -q . \
+              || exit 1
           done
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
