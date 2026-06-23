@@ -203,8 +203,13 @@ class Repository:
             result.append(ref.removeprefix("refs/heads/"))
         return result
 
-    def fetch(self, url: str, branch: str) -> None:
-        self._git("fetch", url, branch)
+    def fetch(self, url: str, branch: str = "", *, tags: bool = False) -> None:
+        args = ["fetch", url]
+        if branch:
+            args.append(branch)
+        if tags:
+            args.extend(["--tags", "--force"])
+        self._git(*args)
 
     def rev_parse(self, ref: str, *, short: bool = False) -> str:
         args = ["rev-parse"]
@@ -704,7 +709,8 @@ def get_backport_branches(repo: Repository) -> list[str]:
 
 def check_release_status(repo: Repository) -> None:
     """Print available releases and unpublished tags."""
-    remote_tags = repo.remote_version_tags(REPO_URL)
+    repo.fetch(REPO_URL, tags=True)
+    local_tags = repo.local_version_tags()
     pypi_versions = fetch_pypi_versions()
 
     branches = [DEFAULT_BRANCH] + get_backport_branches(repo)
@@ -713,21 +719,21 @@ def check_release_status(repo: Repository) -> None:
     info(f"Branches: {', '.join(branches)}")
     info("Available releases")
     for branch in branches:
-        if branch == "master":
-            series = remote_tags
+        if branch == DEFAULT_BRANCH:
+            local_series = local_tags
         else:
             major, minor = (int(x) for x in branch.split("."))
-            series = [
+            local_series = [
                 t
-                for t in remote_tags
+                for t in local_tags
                 if Version(t).release[:2] == (major, minor)
             ]
 
-        if not series:
+        if not local_series:
             info(f"  {branch:<{col}}  —")
             continue
 
-        latest = max(series, key=Version)
+        latest = max(local_series, key=Version)
         tip = repo.fetch_branch_tip(REPO_URL, branch)
         commits = repo.commits_between(latest, tip)
         count = len(commits) - 1  # exclude the post-release bump commit
@@ -743,12 +749,14 @@ def check_release_status(repo: Repository) -> None:
 
     info("Unpublished releases")
     active_series = {
-        tuple(int(x) for x in b.split(".")) for b in branches if b != "master"
+        tuple(int(x) for x in b.split("."))
+        for b in branches
+        if b != DEFAULT_BRANCH
     }
     unpublished = sorted(
         [
             t
-            for t in remote_tags
+            for t in local_tags
             if t not in pypi_versions
             and Version(t).release[:2] in active_series
         ],
@@ -912,6 +920,11 @@ def main() -> None:
     except InvalidReleaseError as e:
         print(f"[ERROR] {e}", file=sys.stderr)  # noqa: T201
         sys.exit(1)
+    except subprocess.CalledProcessError as e:
+        print(f"[ERROR] {e}", file=sys.stderr)  # noqa: T201
+        if e.stderr:
+            print(e.stderr, file=sys.stderr)  # noqa: T201
+        sys.exit(2)
     except Exception as e:
         print(f"[ERROR] {e}", file=sys.stderr)  # noqa: T201
         sys.exit(2)
