@@ -17,6 +17,7 @@ import urllib.error
 import urllib.request
 from abc import ABC
 from abc import abstractmethod
+from typing import NamedTuple
 from typing import Optional
 
 from packaging.version import InvalidVersion
@@ -711,6 +712,13 @@ def update_github_files(repo: Repository) -> bool:
     return True
 
 
+class BranchStatus(NamedTuple):
+    branch: str
+    current: Optional[str]
+    next_version: Optional[str]
+    unreleased: int
+
+
 def get_backport_branches(repo: Repository) -> list[str]:
     """Return the last two X.Y maintenance branches from the remote, newest first."""
     all_remote = repo.remote_branches(REPO_URL, "[0-9]*.[0-9]*")
@@ -722,17 +730,10 @@ def get_backport_branches(repo: Repository) -> list[str]:
     return sorted(xy, key=lambda b: Version(b + ".0"), reverse=True)[:2]
 
 
-def check_release_status(repo: Repository) -> None:
-    """Print available releases and unpublished tags."""
-    repo.fetch(REPO_URL, tags=True)
-    local_tags = repo.local_version_tags()
-    pypi_versions = fetch_pypi_versions()
-
-    branches = [DEFAULT_BRANCH] + get_backport_branches(repo)
-    col = max(len(b) for b in branches)
-
-    info(f"Branches: {', '.join(branches)}")
-    info("Available releases")
+def _collect_branch_statuses(
+    repo: Repository, branches: list[str], local_tags: list[str]
+) -> list[BranchStatus]:
+    statuses = []
     for branch in branches:
         if branch == DEFAULT_BRANCH:
             local_series = local_tags
@@ -745,22 +746,51 @@ def check_release_status(repo: Repository) -> None:
             ]
 
         if not local_series:
-            info(f"  {branch:<{col}}  —")
+            statuses.append(BranchStatus(branch, None, None, 0))
             continue
 
-        latest = max(local_series, key=Version)
+        current = max(local_series, key=Version)
         tip = repo.fetch_branch_tip(REPO_URL, branch)
-        commits = repo.commits_between(latest, tip)
-        count = len(commits) - 1  # exclude the post-release bump commit
+        raw = repo.show_file("FETCH_HEAD", "dynaconf/VERSION")
+        next_v = Version(raw).base_version
+        commits = repo.commits_between(current, tip)
+        count = max(
+            0, len(commits) - 1
+        )  # exclude the post-release bump commit
+        statuses.append(BranchStatus(branch, current, next_v, count))
+    return statuses
 
-        if count <= 0:
-            info(f"  {branch:<{col}}  —")
-        else:
-            raw = repo.show_file("FETCH_HEAD", "dynaconf/VERSION")
-            next_v = Version(raw).base_version
-            info(
-                f"  {branch:<{col}}  {next_v}  ({count} commits since {latest})"
-            )
+
+def _print_branch_table(statuses: list[BranchStatus]) -> None:
+    rows = [
+        (
+            s.branch,
+            s.current or "—",
+            s.next_version or "—",
+            f"{s.unreleased} commits" if s.unreleased > 0 else "—",
+        )
+        for s in statuses
+    ]
+    headers = ("Branch", "Current", "Next", "Unreleased")
+    widths = [
+        max(len(headers[i]), max(len(r[i]) for r in rows))
+        for i in range(len(headers))
+    ]
+    fmt = "  ".join(f"{{:<{w}}}" for w in widths)
+    info(fmt.format(*headers))
+    for row in rows:
+        info(fmt.format(*row))
+
+
+def check_release_status(repo: Repository) -> None:
+    """Print available releases and unpublished tags."""
+    repo.fetch(REPO_URL, tags=True)
+    local_tags = repo.local_version_tags()
+    pypi_versions = fetch_pypi_versions()
+    branches = [DEFAULT_BRANCH] + get_backport_branches(repo)
+
+    statuses = _collect_branch_statuses(repo, branches, local_tags)
+    _print_branch_table(statuses)
 
     info("Unpublished releases")
     active_series = {
