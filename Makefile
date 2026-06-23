@@ -83,7 +83,7 @@ check-releases:
 
 # Bump X.Y.Z.dev to X.Y+1.0.dev
 bump-minor:
-	bump-my-version bump minor --commit
+	uv run bump-my-version bump minor --commit
 
 clean:
 	@find ./ -name '*.pyc' -exec rm -f {} \;
