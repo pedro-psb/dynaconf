@@ -47,15 +47,17 @@ jobs:
       - name: Resolve backport branch
         id: branch
         run: |
-          BRANCH=$(uv run release-utility get backport-branch)
+          # Exits 1 (no output) for patch releases — no backport branch is created.
+          BRANCH=$(uv run release-utility get backport-branch) || true
           echo "name=$BRANCH" >> "$GITHUB_OUTPUT"
       - name: Push release
         run: |
-          # --atomic ensures all three refs land together or none do.
+          # --atomic ensures all refs land together or none do.
           # master: the release commit + post-release bump commit.
           # tag: the annotated release tag created locally by rolling-release.
-          # backport branch: the X.Y branch created or fast-forwarded by rolling-release.
-          git push --atomic origin \
-            master \
-            "refs/tags/${{ inputs.expected-release }}" \
-            "${{ steps.branch.outputs.name }}"
+          # backport branch: only pushed for new minor releases (X.(Y-1) branch).
+          REFS="master refs/tags/${{ inputs.expected-release }}"
+          if [[ -n "${{ steps.branch.outputs.name }}" ]]; then
+            REFS="$REFS ${{ steps.branch.outputs.name }}"
+          fi
+          git push --atomic origin $REFS

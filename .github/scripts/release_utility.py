@@ -241,13 +241,8 @@ class Repository:
     def create_tag(self, name: str, message: str) -> None:
         self._git("tag", "--annotate", name, "--message", message)
 
-    def create_branch(self, name: str) -> None:
-        self._git("branch", name)
-
-    def fast_forward_branch(self, name: str, expected_tip: str) -> None:
-        # update-ref is atomic: fails if the branch tip moved since we checked,
-        # unlike `branch -f` which would silently overwrite any intervening change.
-        self._git("update-ref", f"refs/heads/{name}", "HEAD", expected_tip)
+    def create_branch(self, name: str, at: str = "HEAD") -> None:
+        self._git("branch", name, at)
 
 
 class VersionBumper:
@@ -376,30 +371,39 @@ class RollingReleaser(Releaser):
 
         info(f"[OK] Release {expected!r} passed all validation checks.")
 
+    def _create_backport_branch(self, major: int, minor: int) -> None:
+        prev_branch = f"{major}.{minor - 1}"
+        prev_tags = [
+            t
+            for t in self.repo.local_version_tags()
+            if Version(t).release[:2] == (major, minor - 1)
+        ]
+        if self.repo.branch_exists(prev_branch):
+            info(f"[BRANCH] {prev_branch} already exists, skipping")
+        elif prev_tags:
+            last_prev_tag = max(prev_tags, key=Version)
+            anchor = self.repo.commits_between(last_prev_tag, "HEAD")[-1]
+            self.repo.create_branch(prev_branch, at=anchor)
+            info(
+                f"[BRANCH] Created backport branch: {prev_branch} at {anchor[:7]}"
+            )
+        else:
+            info(f"[BRANCH] No {prev_branch} tags found, skipping")
+
     def release(self, *, yes: bool = False) -> None:
         previous = max(self.repo.local_version_tags(), key=Version)
         next_version = self.bumper.calculated_next()
         info(f"Previous release : {previous}")
         info(f"Next release     : {next_version}")
         self.validate(next_version)
-        check_backport_branch_compatible(self.repo, next_version)
         self._confirm(yes)
         current_version = self._cut_release(previous)
 
-        major, minor, _ = Version(current_version).release
-        branch = f"{major}.{minor}"
-        if not self.repo.branch_exists(branch):
-            self.repo.create_branch(branch)
-            info(f"[BRANCH] Created backport branch: {branch}")
-        elif self.repo.is_ancestor(
-            tip := self.repo.branch_tip(branch), "HEAD"
-        ):
-            self.repo.fast_forward_branch(branch, tip)
-            info(f"[BRANCH] Fast-forwarded {branch} to HEAD")
-        else:
-            info(
-                f"[BRANCH] Backport branch {branch} already exists and has diverged, skipping"
-            )
+        major, minor, patch = Version(current_version).release
+        if patch == 0 and minor > 0:
+            # New minor release: create the X.(Y-1) maintenance branch anchored at
+            # the post-release bump of the last X.(Y-1) tag, not at the current HEAD.
+            self._create_backport_branch(major, minor)
 
         info("[COMMIT] Done.")
 
@@ -674,25 +678,6 @@ def check_clean_working_tree(repo: Repository) -> None:
         raise InvalidReleaseError(f"Working tree is not clean:\n{status}")
 
 
-def check_backport_branch_compatible(repo: Repository, version: str) -> None:
-    """Raise if the X.Y backport branch exists and has diverged from HEAD.
-
-    A diverged branch means a backport release is in progress on that branch
-    and a rolling release would conflict with it.
-    """
-    major, minor, _ = Version(version).release
-    branch = f"{major}.{minor}"
-    if repo.branch_exists(branch) and not repo.is_ancestor(
-        repo.branch_tip(branch), "HEAD"
-    ):
-        raise InvalidReleaseError(
-            f"Backport branch {branch!r} exists and has diverged from HEAD.\n"
-            f"To release {version!r}, either:\n"
-            f"  1) Use the backport-release command if the patch fix belongs on {branch}\n"
-            f"  2) Bump the minor version on master to perform a {major}.{minor + 1}.0 release instead"
-        )
-
-
 def update_github_files(repo: Repository) -> bool:
     """Overwrite .github/ with master's version and commit if changed. Returns True if committed."""
     repo.fetch(REPO_URL, DEFAULT_BRANCH)
@@ -706,20 +691,23 @@ def update_github_files(repo: Repository) -> bool:
     return True
 
 
+def get_backport_branches(repo: Repository) -> list[str]:
+    """Return the last two X.Y maintenance branches from the remote, newest first."""
+    all_remote = repo.remote_branches(REPO_URL, "[0-9]*.[0-9]*")
+    xy = [
+        b
+        for b in all_remote
+        if len(b.split(".")) == 2 and all(p.isdigit() for p in b.split("."))
+    ]
+    return sorted(xy, key=lambda b: Version(b + ".0"), reverse=True)[:2]
+
+
 def check_release_status(repo: Repository) -> None:
     """Print available releases and unpublished tags."""
     remote_tags = repo.remote_version_tags(REPO_URL)
     pypi_versions = fetch_pypi_versions()
 
-    all_remote = repo.remote_branches(REPO_URL, "[0-9]*.[0-9]*")
-    xy_branches = [
-        b
-        for b in all_remote
-        if len(b.split(".")) == 2 and all(p.isdigit() for p in b.split("."))
-    ]
-    branches = ["master"] + sorted(
-        xy_branches, key=lambda b: Version(b + ".0"), reverse=True
-    )[:2]
+    branches = [DEFAULT_BRANCH] + get_backport_branches(repo)
     col = max(len(b) for b in branches)
 
     info(f"Branches: {', '.join(branches)}")
@@ -837,7 +825,7 @@ def build_parser() -> argparse.ArgumentParser:
         description=(
             "Print a computed release value and exit.\n\n"
             "Supported items:\n"
-            "  backport-branch  The X.Y branch name for a release (e.g. 3.3.2 → '3.3'). Accepts optional VALUE=<version>; defaults to calculated next.\n"
+            "  backport-branch  With VALUE: the X.Y branch for that version (e.g. 3.3.2 → '3.3'). Without VALUE: for new minor releases returns X.(Y-1); exits 1 for patch releases (no branch created).\n"
             "  next-version     The calculated next release version (e.g. 3.3.2-dev0 → '3.3.2')\n"
             "  release-type     Whether a tag is a 'rolling' or 'backport' release (requires VALUE=<tag>)"
         ),
@@ -897,24 +885,21 @@ def run(args: argparse.Namespace) -> None:
     elif args.command == "get":
         if args.item == "backport-branch":
             version = args.value or bumper.calculated_next()
-            major, minor, _ = Version(version).release
-            info(f"{major}.{minor}")
+            major, minor, patch = Version(version).release
+            if args.value:
+                # Explicit version: return its X.Y branch (backport context).
+                info(f"{major}.{minor}")
+            elif patch == 0 and minor > 0:
+                # Rolling new-minor release: the branch being created is X.(Y-1).
+                info(f"{major}.{minor - 1}")
+            else:
+                # Rolling patch release: no backport branch involved.
+                sys.exit(1)
         elif args.item == "next-version":
             info(bumper.calculated_next())
         elif args.item == "backport-branches":
-            all_remote = repo.remote_branches(REPO_URL, "[0-9]*.[0-9]*")
-            xy = [
-                b
-                for b in all_remote
-                if len(b.split(".")) == 2
-                and all(p.isdigit() for p in b.split("."))
-            ]
-            master_tip = repo.fetch_branch_tip(REPO_URL, DEFAULT_BRANCH)
-            for b in sorted(xy, key=lambda b: Version(b + ".0"), reverse=True)[:2]:
-                tip = repo.fetch_branch_tip(REPO_URL, b)
-                # Skip branches whose tip is still reachable from master (not yet diverged).
-                if not repo.is_ancestor(tip, master_tip):
-                    info(b)
+            for b in get_backport_branches(repo):
+                info(b)
         elif args.item == "release-type":
             remote_tags = repo.remote_version_tags(REPO_URL)
             info(Releaser.get_release_type(args.value, remote_tags))
