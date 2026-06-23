@@ -2,6 +2,15 @@ Changelog
 =========
 
 <!-- insertion marker -->
+## [3.4.4](https://github.com/pedro-psb/dynaconf/releases/tag/3.4.4) - 2026-06-23
+
+### Chore
+
+- CI update from master (bd2726d). *By pedro-psb*.
+- CI update from master (a5ff6c6). *By pedro-psb*.
+- CI update from master (ffbfdc4). *By pedro-psb*.
+- bump version to 3.4.4-dev0. *By pedro-psb*.
+
 ## [3.4.3](https://github.com/pedro-psb/dynaconf/releases/tag/3.4.3) - 2026-06-23
 
 ### Chore
