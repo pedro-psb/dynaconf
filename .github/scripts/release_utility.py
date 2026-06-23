@@ -833,7 +833,7 @@ def build_parser() -> argparse.ArgumentParser:
         description=(
             "Print a computed release value and exit.\n\n"
             "Supported items:\n"
-            "  backport-branch  With VALUE: the X.Y branch for that version (e.g. 3.3.2 → '3.3'). Without VALUE: for new minor releases returns X.(Y-1); exits 1 for patch releases (no branch created).\n"
+            "  backport-branch  The maintenance branch for VALUE: X.(Y-1) for new minor releases (e.g. 3.6.0 → '3.5'), X.Y for backport patch releases (e.g. 3.5.2 → '3.5'). Exits 1 if no branch applies.\n"
             "  next-version     The calculated next release version (e.g. 3.3.2-dev0 → '3.3.2')\n"
             "  release-type     Whether a tag is a 'rolling' or 'backport' release (requires VALUE=<tag>)"
         ),
@@ -892,16 +892,16 @@ def run(args: argparse.Namespace) -> None:
         check_release_status(repo)
     elif args.command == "get":
         if args.item == "backport-branch":
-            version = args.value or bumper.calculated_next()
-            major, minor, patch = Version(version).release
-            if args.value:
-                # Explicit version: return its X.Y branch (backport context).
-                info(f"{major}.{minor}")
-            elif patch == 0 and minor > 0:
-                # Rolling new-minor release: the branch being created is X.(Y-1).
+            if not args.value:
+                sys.exit(1)
+            major, minor, patch = Version(args.value).release
+            if patch == 0 and minor > 0:
+                # New minor release (e.g. 3.6.0): the backport branch created is X.(Y-1).
                 info(f"{major}.{minor - 1}")
+            elif patch > 0:
+                # Backport patch release (e.g. 3.5.2): the branch is X.Y.
+                info(f"{major}.{minor}")
             else:
-                # Rolling patch release: no backport branch involved.
                 sys.exit(1)
         elif args.item == "next-version":
             info(bumper.calculated_next())
