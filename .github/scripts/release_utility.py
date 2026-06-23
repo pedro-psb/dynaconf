@@ -210,6 +210,10 @@ class Repository:
             result.append(ref.removeprefix("refs/heads/"))
         return result
 
+    def show_file(self, ref: str, path: str) -> str:
+        result, _ = self._git("show", f"{ref}:{path}")
+        return result
+
     def fetch(self, url: str, branch: str = "", *, tags: bool = False) -> None:
         args = ["fetch", url]
         if branch:
@@ -752,8 +756,8 @@ def check_release_status(repo: Repository) -> None:
         if count <= 0:
             info(f"  {branch:<{col}}  —")
         else:
-            maj, min_, patch = Version(latest).release
-            next_v = f"{maj}.{min_}.{patch + 1}"
+            raw = repo.show_file("FETCH_HEAD", "dynaconf/VERSION")
+            next_v = Version(raw).base_version
             info(
                 f"  {branch:<{col}}  {next_v}  ({count} commits since {latest})"
             )
