@@ -35,6 +35,13 @@ PYPI_URL = "https://test.pypi.org/pypi/dynaconf/json"  # was pypi.org
 RUNNING_CI = bool(os.getenv("CI"))
 
 
+def _write_github_output(key: str, value: str) -> None:
+    path = os.getenv("GITHUB_OUTPUT")
+    if path:
+        with open(path, "a") as f:
+            f.write(f"{key}={value}\n")
+
+
 def fetch_pypi_versions() -> list[str]:
     """Return the list of versions published on PyPI for dynaconf."""
     try:
@@ -201,6 +208,10 @@ class Repository:
         for line in output.splitlines():
             ref = line.split("\t")[1]
             result.append(ref.removeprefix("refs/heads/"))
+        return result
+
+    def show_file(self, ref: str, path: str) -> str:
+        result, _ = self._git("show", f"{ref}:{path}")
         return result
 
     def fetch(self, url: str, branch: str = "", *, tags: bool = False) -> None:
@@ -376,7 +387,7 @@ class RollingReleaser(Releaser):
 
         info(f"[OK] Release {expected!r} passed all validation checks.")
 
-    def _create_backport_branch(self, major: int, minor: int) -> None:
+    def _create_backport_branch(self, major: int, minor: int) -> Optional[str]:
         prev_branch = f"{major}.{minor - 1}"
         prev_tags = [
             t
@@ -392,8 +403,10 @@ class RollingReleaser(Releaser):
             info(
                 f"[BRANCH] Created backport branch: {prev_branch} at {anchor[:7]}"
             )
+            return prev_branch
         else:
             info(f"[BRANCH] No {prev_branch} tags found, skipping")
+        return None
 
     def release(self, *, yes: bool = False) -> None:
         previous = max(self.repo.local_version_tags(), key=Version)
@@ -408,7 +421,9 @@ class RollingReleaser(Releaser):
         if patch == 0 and minor > 0:
             # New minor release: create the X.(Y-1) maintenance branch anchored at
             # the post-release bump of the last X.(Y-1) tag, not at the current HEAD.
-            self._create_backport_branch(major, minor)
+            branch = self._create_backport_branch(major, minor)
+            if branch:
+                _write_github_output("backport-branch", branch)
 
         info("[COMMIT] Done.")
 
@@ -741,8 +756,8 @@ def check_release_status(repo: Repository) -> None:
         if count <= 0:
             info(f"  {branch:<{col}}  —")
         else:
-            maj, min_, patch = Version(latest).release
-            next_v = f"{maj}.{min_}.{patch + 1}"
+            raw = repo.show_file("FETCH_HEAD", "dynaconf/VERSION")
+            next_v = Version(raw).base_version
             info(
                 f"  {branch:<{col}}  {next_v}  ({count} commits since {latest})"
             )
@@ -805,7 +820,11 @@ def build_parser() -> argparse.ArgumentParser:
         description=(
             "Cut a VCS/git tagged release from whatever version is currently on main.\n\n"
             "Does not publish to PyPI. Steps: bump dev -> release, update changelog, "
-            "commit, tag, then bump to next dev."
+            "commit, tag, then bump to next dev.\n\n"
+            "GitHub Actions output (written to GITHUB_OUTPUT when CI=true):\n"
+            "  backport-branch  Name of the X.(Y-1) maintenance branch created for a new\n"
+            "                   minor release (e.g. '3.5' after releasing 3.6.0). Not set\n"
+            "                   for patch releases."
         ),
         formatter_class=HELP_FORMATTER,
     )
@@ -833,7 +852,7 @@ def build_parser() -> argparse.ArgumentParser:
         description=(
             "Print a computed release value and exit.\n\n"
             "Supported items:\n"
-            "  backport-branch  The maintenance branch for VALUE: X.(Y-1) for new minor releases (e.g. 3.6.0 → '3.5'), X.Y for backport patch releases (e.g. 3.5.2 → '3.5'). Exits 1 if no branch applies.\n"
+            "  backport-branch  The X.Y maintenance branch for a given tag (e.g. 3.5.2 → '3.5'). Requires VALUE.\n"
             "  next-version     The calculated next release version (e.g. 3.3.2-dev0 → '3.3.2')\n"
             "  release-type     Whether a tag is a 'rolling' or 'backport' release (requires VALUE=<tag>)"
         ),
@@ -894,15 +913,8 @@ def run(args: argparse.Namespace) -> None:
         if args.item == "backport-branch":
             if not args.value:
                 sys.exit(1)
-            major, minor, patch = Version(args.value).release
-            if patch == 0 and minor > 0:
-                # New minor release (e.g. 3.6.0): the backport branch created is X.(Y-1).
-                info(f"{major}.{minor - 1}")
-            elif patch > 0:
-                # Backport patch release (e.g. 3.5.2): the branch is X.Y.
-                info(f"{major}.{minor}")
-            else:
-                sys.exit(1)
+            major, minor, _ = Version(args.value).release
+            info(f"{major}.{minor}")
         elif args.item == "next-version":
             info(bumper.calculated_next())
         elif args.item == "backport-branches":
