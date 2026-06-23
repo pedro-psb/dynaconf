@@ -42,14 +42,12 @@ jobs:
         run: |
           uv run release-utility validate "${{ inputs.expected-release }}"
       - name: Create release commits
+        id: release
         run: |
+          # For new minor releases (X.Y.0), sets the 'backport-branch' output with the
+          # name of the X.(Y-1) maintenance branch created locally (e.g. '3.5' after 3.6.0).
+          # Not set for patch releases.
           uv run release-utility rolling-release -y
-      - name: Resolve backport branch
-        id: branch
-        run: |
-          # Exits 1 (no output) for patch releases — no backport branch is created.
-          BRANCH=$(uv run release-utility get backport-branch "${{ inputs.expected-release }}") || true
-          echo "name=$BRANCH" >> "$GITHUB_OUTPUT"
       - name: Push release
         run: |
           # --atomic ensures all refs land together or none do.
@@ -57,7 +55,7 @@ jobs:
           # tag: the annotated release tag created locally by rolling-release.
           # backport branch: only pushed for new minor releases (X.(Y-1) branch).
           REFS="master refs/tags/${{ inputs.expected-release }}"
-          if [[ -n "${{ steps.branch.outputs.name }}" ]]; then
-            REFS="$REFS ${{ steps.branch.outputs.name }}"
+          if [[ -n "${{ steps.release.outputs.backport-branch }}" ]]; then
+            REFS="$REFS ${{ steps.release.outputs.backport-branch }}"
           fi
           git push --atomic origin $REFS
