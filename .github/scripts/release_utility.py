@@ -883,6 +883,7 @@ def build_parser() -> argparse.ArgumentParser:
             "Print a computed release value and exit.\n\n"
             "Supported items:\n"
             "  backport-branch  The X.Y maintenance branch for a given tag (e.g. 3.5.2 → '3.5'). Requires VALUE.\n"
+            "  is-latest        'true' if VALUE is greater than all versions on PyPI, 'false' otherwise. Requires VALUE.\n"
             "  next-version     The calculated next release version (e.g. 3.3.2-dev0 → '3.3.2')\n"
             "  release-type     Whether a tag is a 'rolling' or 'backport' release (requires VALUE=<tag>)"
         ),
@@ -893,6 +894,7 @@ def build_parser() -> argparse.ArgumentParser:
         choices=[
             "backport-branch",
             "backport-branches",
+            "is-latest",
             "next-version",
             "release-type",
         ],
@@ -945,6 +947,14 @@ def run(args: argparse.Namespace) -> None:
                 sys.exit(1)
             major, minor, _ = Version(args.value).release
             info(f"{major}.{minor}")
+        elif args.item == "is-latest":
+            if not args.value:
+                sys.exit(1)
+            pypi_versions = fetch_pypi_versions()
+            is_latest = not pypi_versions or Version(args.value) > Version(
+                max(pypi_versions, key=Version)
+            )
+            info("true" if is_latest else "false")
         elif args.item == "next-version":
             info(bumper.calculated_next())
         elif args.item == "backport-branches":
