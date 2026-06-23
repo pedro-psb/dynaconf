@@ -13,7 +13,7 @@ on:
 
 jobs:
   validate:
-    name: "Validate release"
+    name: "Validate publication"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -40,8 +40,11 @@ jobs:
           git checkout "${{ inputs.release-tag || github.ref_name }}"
       - name: Validate release
         run: |
-          FLAG=$([[ "${{ steps.release-type.outputs.value }}" == "backport" ]] && echo "--backport" || echo "")
-          uv run release-utility validate --pre-publish $FLAG "${{ inputs.release-tag || github.ref_name }}"
+          if [[ "${{ steps.release-type.outputs.value }}" == "backport" ]]; then
+            uv run release-utility validate --pre-publish --backport "${{ inputs.release-tag || github.ref_name }}"
+          else
+            uv run release-utility validate --pre-publish "${{ inputs.release-tag || github.ref_name }}"
+          fi
 
   build-dist:
     name: "Build distribution"
