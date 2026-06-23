@@ -29,6 +29,7 @@ BUMP_FILES = [
     "pyproject.toml",
 ]
 RELEASE_COMMIT_MSG = "Release version {version}"
+CI_UPDATE_MSG = "chore(ci): CI update from master ({sha})"
 REPO_URL = "https://github.com/pedro-psb/dynaconf.git"  # was dynaconf/dynaconf
 PYPI_URL = "https://test.pypi.org/pypi/dynaconf/json"  # was pypi.org
 RUNNING_CI = bool(os.getenv("CI"))
@@ -700,7 +701,7 @@ def update_github_files(repo: Repository) -> bool:
     if not repo.staged_files():
         info("[OK] .github/ already up to date.")
         return False
-    repo.commit(f"sync: update .github/ from master ({sha})")
+    repo.commit(CI_UPDATE_MSG.format(sha=sha))
     info(f"[OK] .github/ committed from master ({sha}).")
     return True
 
