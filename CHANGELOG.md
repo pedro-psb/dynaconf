@@ -2,6 +2,30 @@ Changelog
 =========
 
 <!-- insertion marker -->
+## [3.5.2](https://github.com/pedro-psb/dynaconf/releases/tag/3.5.2) - 2026-06-23
+
+### Bug Fixes
+
+- harden pre-publish check on backport release. *By Pedro Brochado*.
+
+### Features
+
+- add sync (.github files) workflow for backport PR. *By Pedro Brochado*.
+- add make check-releases command to make. *By Pedro Brochado*.
+
+### Chore
+
+- rename update-ci workflow. *By Pedro Brochado*.
+- change bump-minor to use uv. *By Pedro Brochado*.
+- backport branches are only created on minor releases. *By Pedro Brochado*.
+- update ci update commit message. *By Pedro Brochado*.
+- select only diverged backport branches for CI update. *By Pedro Brochado*.
+- update sync-github workflow permission. *By Pedro Brochado*.
+- remove tag trigger and call it directly. *By Pedro Brochado*.
+- fix rolling relesae next version. *By Pedro Brochado*.
+- bump version to 3.4.4-dev0. *By Pedro Brochado*.
+- bump version to 3.5.2-dev0. *By pedro-psb*.
+
 ## [3.5.1](https://github.com/pedro-psb/dynaconf/releases/tag/3.5.1) - 2026-06-22
 
 ### Bug Fixes
