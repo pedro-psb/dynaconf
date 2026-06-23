@@ -205,6 +205,21 @@ class Repository:
     def fetch(self, url: str, branch: str) -> None:
         self._git("fetch", url, branch)
 
+    def rev_parse(self, ref: str, *, short: bool = False) -> str:
+        args = ["rev-parse"]
+        if short:
+            args.append("--short")
+        args.append(ref)
+        result, _ = self._git(*args)
+        return result
+
+    def staged_files(self) -> list[str]:
+        output, _ = self._git("diff", "--cached", "--name-only")
+        return output.splitlines()
+
+    def checkout_path_from_ref(self, ref: str, path: str) -> None:
+        self._git("checkout", ref, "--", path)
+
     def fetch_branch_tip(self, url: str, branch: str) -> str:
         """Fetch a remote branch and return its tip commit hash."""
         self.fetch(url, branch)
@@ -677,6 +692,19 @@ def check_backport_branch_compatible(repo: Repository, version: str) -> None:
         )
 
 
+def update_github_files(repo: Repository) -> bool:
+    """Overwrite .github/ with master's version and commit if changed. Returns True if committed."""
+    repo.fetch(REPO_URL, DEFAULT_BRANCH)
+    sha = repo.rev_parse("FETCH_HEAD", short=True)
+    repo.checkout_path_from_ref("FETCH_HEAD", ".github/")
+    if not repo.staged_files():
+        info("[OK] .github/ already up to date.")
+        return False
+    repo.commit(f"sync: update .github/ from master ({sha})")
+    info(f"[OK] .github/ committed from master ({sha}).")
+    return True
+
+
 def check_release_status(repo: Repository) -> None:
     """Print available releases and unpublished tags."""
     remote_tags = repo.remote_version_tags(REPO_URL)
@@ -816,13 +844,24 @@ def build_parser() -> argparse.ArgumentParser:
     )
     get_parser.add_argument(
         "item",
-        choices=["backport-branch", "next-version", "release-type"],
+        choices=[
+            "backport-branch",
+            "backport-branches",
+            "next-version",
+            "release-type",
+        ],
         help="The value to retrieve",
     )
     get_parser.add_argument(
         "value",
         nargs="?",
         help="Tag name (required for release-type)",
+    )
+
+    subparsers.add_parser(
+        "update-github",
+        help="Overwrite .github/ with the version from master",
+        formatter_class=HELP_FORMATTER,
     )
 
     subparsers.add_parser(
@@ -847,6 +886,9 @@ def run(args: argparse.Namespace) -> None:
         RollingReleaser(repo, bumper).release(yes=args.yes)
     elif args.command == "backport-release":
         BackportReleaser(repo, bumper).release(yes=args.yes)
+    elif args.command == "update-github":
+        if not update_github_files(repo):
+            sys.exit(1)
     elif args.command == "check":
         global _DEBUG
         _DEBUG = False
@@ -858,6 +900,18 @@ def run(args: argparse.Namespace) -> None:
             info(f"{major}.{minor}")
         elif args.item == "next-version":
             info(bumper.calculated_next())
+        elif args.item == "backport-branches":
+            all_remote = repo.remote_branches(REPO_URL, "[0-9]*.[0-9]*")
+            xy = [
+                b
+                for b in all_remote
+                if len(b.split(".")) == 2
+                and all(p.isdigit() for p in b.split("."))
+            ]
+            for b in sorted(xy, key=lambda b: Version(b + ".0"), reverse=True)[
+                :2
+            ]:
+                info(b)
         elif args.item == "release-type":
             remote_tags = repo.remote_version_tags(REPO_URL)
             info(Releaser.get_release_type(args.value, remote_tags))

@@ -60,10 +60,3 @@ jobs:
           git push --atomic origin \
             "${{ steps.branch.outputs.name }}" \
             "refs/tags/${{ inputs.expected-release }}"
-
-  publish:
-    name: "Publish"
-    needs: [backport-release]
-    uses: ./.github/workflows/publish.yml
-    with:
-      release-tag: ${{ inputs.expected-release }}

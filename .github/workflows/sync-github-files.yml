@@ -1,0 +1,58 @@
+name: Sync GitHub files to backport branches
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - '.github/**'
+
+jobs:
+  sync:
+    name: "Create sync PRs for backport branches"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+      - uses: actions/checkout@v7
+        with:
+          ref: master
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+      - name: Install uv
+        uses: astral-sh/setup-uv@v8.2.0
+        with:
+          python-version: "3.9"
+      - name: Install release tools
+        run: |
+          uv sync --only-group release
+          # Install from master before switching branches so the command survives checkout.
+          uv pip install .github/scripts/
+      - name: Set up git identity
+        run: |
+          git config user.name "${{ github.actor }}"
+          git config user.email "${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com"
+      - name: Create sync PRs
+        run: |
+          BRANCHES=$(uv run release-utility get backport-branches)
+          for BRANCH in $BRANCHES; do
+            SYNC_BRANCH="sync-github-files/$BRANCH"
+            git checkout -B "$SYNC_BRANCH" "origin/$BRANCH"
+            if ! uv run release-utility update-github; then
+              echo "No .github/ changes for $BRANCH, skipping"
+              continue
+            fi
+            git push origin "$SYNC_BRANCH" --force-with-lease
+            gh pr create \
+              --base "$BRANCH" \
+              --head "$SYNC_BRANCH" \
+              --title "sync: update .github/ files for $BRANCH" \
+              --body "Automated sync of \`.github/\` from master." \
+              || echo "PR already open for $BRANCH, skipping"
+          done
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}

@@ -1,11 +1,9 @@
 name: Publish
 
 on:
-  workflow_call:
-    inputs:
-      release-tag:
-        required: true
-        type: string
+  push:
+    tags:
+      - "[0-9]+.[0-9]+.[0-9]+"
   workflow_dispatch:
     inputs:
       release-tag:
@@ -35,29 +33,29 @@ jobs:
       - name: Detect release type
         id: release-type
         run: |
-          TYPE=$(uv run release-utility get release-type "${{ inputs.release-tag }}")
+          TYPE=$(uv run release-utility get release-type "${{ inputs.release-tag || github.ref_name }}")
           echo "value=$TYPE" >> "$GITHUB_OUTPUT"
       - name: Check out release tag
         run: |
-          git checkout "${{ inputs.release-tag }}"
+          git checkout "${{ inputs.release-tag || github.ref_name }}"
       - name: Validate release
         run: |
           FLAG=$([[ "${{ steps.release-type.outputs.value }}" == "backport" ]] && echo "--backport" || echo "")
-          uv run release-utility validate --pre-publish $FLAG "${{ inputs.release-tag }}"
+          uv run release-utility validate --pre-publish $FLAG "${{ inputs.release-tag || github.ref_name }}"
 
   build-dist:
     name: "Build distribution"
     needs: [validate]
     uses: ./.github/workflows/build-dist.yml
     with:
-      release-tag: ${{ inputs.release-tag }}
+      release-tag: ${{ inputs.release-tag || github.ref_name }}
 
   build-docs:
     name: "Build documentation"
     needs: [validate]
     uses: ./.github/workflows/build-docs.yml
     with:
-      release-tag: ${{ inputs.release-tag }}
+      release-tag: ${{ inputs.release-tag || github.ref_name }}
 
   publish-pypi:
     name: "Publish to PyPI"
@@ -94,7 +92,7 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           body_path: release-notes.md
-          tag_name: ${{ inputs.release-tag }}
+          tag_name: ${{ inputs.release-tag || github.ref_name }}
 
   # publish-docs:
   #   name: "Publish documentation"
