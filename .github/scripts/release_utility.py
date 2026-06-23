@@ -908,10 +908,12 @@ def run(args: argparse.Namespace) -> None:
                 if len(b.split(".")) == 2
                 and all(p.isdigit() for p in b.split("."))
             ]
-            for b in sorted(xy, key=lambda b: Version(b + ".0"), reverse=True)[
-                :2
-            ]:
-                info(b)
+            master_tip = repo.fetch_branch_tip(REPO_URL, DEFAULT_BRANCH)
+            for b in sorted(xy, key=lambda b: Version(b + ".0"), reverse=True)[:2]:
+                tip = repo.fetch_branch_tip(REPO_URL, b)
+                # Skip branches whose tip is still reachable from master (not yet diverged).
+                if not repo.is_ancestor(tip, master_tip):
+                    info(b)
         elif args.item == "release-type":
             remote_tags = repo.remote_version_tags(REPO_URL)
             info(Releaser.get_release_type(args.value, remote_tags))
