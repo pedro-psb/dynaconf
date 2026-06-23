@@ -54,8 +54,8 @@ jobs:
             gh pr create \
               --base "$BRANCH" \
               --head "$SYNC_BRANCH" \
-              --title "sync: update .github/ files for $BRANCH" \
-              --body "Automated sync of \`.github/\` from master." \
+              --title "[$BRANCH] Automated CI Update" \
+              --body "Sync \`.github/\` from master." \
               || gh pr list --head "$SYNC_BRANCH" --json number --jq '.[0].number' | grep -q . \
               || exit 1
           done
