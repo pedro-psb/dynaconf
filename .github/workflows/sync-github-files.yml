@@ -44,7 +44,8 @@ jobs:
         run: |
           BRANCHES=$(uv run release-utility get backport-branches)
           for BRANCH in $BRANCHES; do
-            SYNC_BRANCH="sync-github-files/$BRANCH"
+            SYNC_BRANCH="bot/ci_update/$BRANCH"
+            # Create or force-reset the sync branch to the remote backport branch tip.
             git checkout -B "$SYNC_BRANCH" "origin/$BRANCH"
             if ! uv run release-utility update-github; then
               echo "No .github/ changes for $BRANCH, skipping"
