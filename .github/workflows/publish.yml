@@ -15,6 +15,8 @@ jobs:
   validate:
     name: "Validate publication"
     runs-on: ubuntu-latest
+    outputs:
+      is-latest: ${{ steps.is-latest.outputs.value }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -45,6 +47,11 @@ jobs:
           else
             uv run release-utility validate --pre-publish "${{ inputs.release-tag || github.ref_name }}"
           fi
+      - name: Check if latest release
+        id: is-latest
+        run: |
+          VALUE=$(uv run release-utility get is-latest "${{ inputs.release-tag || github.ref_name }}")
+          echo "value=$VALUE" >> "$GITHUB_OUTPUT"
 
   build-dist:
     name: "Build distribution"
@@ -99,7 +106,8 @@ jobs:
 
   # publish-docs:
   #   name: "Publish documentation"
-  #   needs: [build-docs, publish-pypi]
+  #   if: needs.validate.outputs.is-latest == 'true'
+  #   needs: [validate, build-docs, publish-pypi]
   #   runs-on: ubuntu-latest
   #   steps:
   #     - name: Download documentation
