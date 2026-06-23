@@ -2,6 +2,21 @@ Changelog
 =========
 
 <!-- insertion marker -->
+## [3.7.0](https://github.com/pedro-psb/dynaconf/releases/tag/3.7.0) - 2026-06-23
+
+### Bug Fixes
+
+- check-release cmd now correctly shows next version from master. *By Pedro Brochado*.
+
+### Features
+
+- some new feature. *By Pedro Brochado*.
+
+### Chore
+
+- bump version to 3.7.0-dev0. *By Pedro Brochado*.
+- bump version to 3.6.2-dev0. *By pedro-psb*.
+
 ## [3.6.1](https://github.com/pedro-psb/dynaconf/releases/tag/3.6.1) - 2026-06-23
 
 ### Bug Fixes
