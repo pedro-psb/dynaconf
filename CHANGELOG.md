@@ -2,6 +2,18 @@ Changelog
 =========
 
 <!-- insertion marker -->
+## [3.6.1](https://github.com/pedro-psb/dynaconf/releases/tag/3.6.1) - 2026-06-23
+
+### Bug Fixes
+
+- the Y rolling-release directly output to GH if it created a Y branch. *By Pedro Brochado*.
+- fix Y rolling release not creating backport branch. *By Pedro Brochado*.
+
+### Chore
+
+- fix check-release command. *By Pedro Brochado*.
+- bump version to 3.6.1-dev0. *By pedro-psb*.
+
 ## [3.6.0](https://github.com/pedro-psb/dynaconf/releases/tag/3.6.0) - 2026-06-23
 
 ### Features
